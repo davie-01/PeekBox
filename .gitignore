@@ -1,0 +1,14 @@
+.DS_Store
+build/
+DerivedData/
+*.xcodeproj/
+xcuserdata/
+.swiftpm/
+Packages/*/.build/
+# 由 Scripts/build-libzip.sh、build-xadmaster.sh 生成
+Packages/PeekCore/Vendor/
+
+# 本地资料
+folder preview/
+/icon/
+/docs/归档/

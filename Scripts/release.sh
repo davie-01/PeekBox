@@ -1,0 +1,81 @@
+#!/bin/zsh
+# 构建指定版本的 Release 包，做交付检查，生成 Sparkle 签名与 appcast。
+# 用法：Scripts/release.sh <版本号> <构建号> [下载地址前缀]
+#   例：Scripts/release.sh 0.1.1 2
+#       Scripts/release.sh 0.1.1 2 http://localhost:8765/     （本机测试更新）
+#   SKIP_APPCAST=1 时只构建与检查，不打包、不签名（签名需读取钥匙串中的私钥）
+# 更新说明：docs/发布说明/<版本号>.md（必需），内嵌进 appcast，检查到更新时显示在更新提示里
+# 产物：build/releases/<版本号>/PeekBox-<版本号>.zip 与 appcast.xml（只含这一个版本）
+# 发布：在 https://github.com/davie-01/Peekbox 新建标签为 v<版本号> 的 Release，上传这两个文件并设为 Latest。
+#       应用的 SUFeedURL 指向 releases/latest/download/appcast.xml，即最新一个 Release 的 appcast.xml
+set -euo pipefail
+
+VERSION=${1:?缺少版本号}
+BUILD=${2:?缺少构建号}
+URL_PREFIX=${3:-https://github.com/davie-01/Peekbox/releases/download/v$VERSION/}
+
+ROOT=${0:A:h:h}
+DERIVED="$ROOT/build/release-derived"
+# 每个版本单独一个目录：appcast 只写这一个版本，下载前缀不会错套到其他版本上
+OUT="$ROOT/build/releases/$VERSION"
+SPARKLE_BIN="$ROOT/build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin"
+NOTES="$ROOT/docs/发布说明/$VERSION.md"
+
+cd "$ROOT"
+# 先检查更新说明，避免构建完才发现缺失
+[[ "${SKIP_APPCAST:-0}" == 1 || -s "$NOTES" ]] || { echo "错误：缺少更新说明 $NOTES" >&2; exit 1; }
+[[ -d Packages/PeekCore/Vendor/libzip.xcframework ]] || ./Scripts/build-libzip.sh
+[[ -d Packages/PeekCore/Vendor/XADMaster.xcframework ]] || ./Scripts/build-xadmaster.sh
+./Scripts/generate-project.sh
+if [[ ! -x "$SPARKLE_BIN/generate_appcast" ]]; then
+  xcodebuild -resolvePackageDependencies -project PeekBox.xcodeproj -scheme PeekBox \
+    -derivedDataPath "$ROOT/build/DerivedData" -quiet
+fi
+
+xcodebuild -project PeekBox.xcodeproj -scheme PeekBox -configuration Release \
+  -derivedDataPath "$DERIVED" -destination 'platform=macOS,arch=arm64' \
+  ARCHS=arm64 MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" build -quiet
+
+APP="$DERIVED/Build/Products/Release/PeekBox.app"
+if find "$APP" -name embedded.provisionprofile | grep -q .; then
+  echo "错误：产物中包含 embedded.provisionprofile" >&2
+  exit 1
+fi
+codesign --verify --deep --strict "$APP"
+
+# 交付检查：不得混入 Debug / 预览专用产物；图标已编译；后台服务位于 Helpers 且复用主应用的框架；附带许可原文
+fail() { echo "错误：$1" >&2; exit 1; }
+if find "$APP" \( -name "*.debug.dylib" -o -name "__preview.dylib" -o -name "*.dSYM" \) | grep -q .; then
+  find "$APP" \( -name "*.debug.dylib" -o -name "__preview.dylib" -o -name "*.dSYM" \) >&2
+  fail "产物中包含 Debug 专用文件"
+fi
+# 先取完整输出再查找：在 pipefail 下 grep -q 提前退出会让 assetutil 因管道关闭而失败，检查时好时坏
+ASSETS=$(xcrun assetutil --info "$APP/Contents/Resources/Assets.car" 2>/dev/null || true)
+[[ "$ASSETS" == *'"Name" : "AppIcon"'* ]] || fail "Assets.car 中没有 AppIcon（图标未编译，见 Scripts/generate-project.sh）"
+BROKER="$APP/Contents/Helpers/PeekBoxBroker.app"
+[[ -x "$BROKER/Contents/MacOS/PeekBoxBroker" ]] || fail "缺少后台服务 $BROKER"
+[[ ! -d "$BROKER/Contents/Frameworks/XADMaster.framework" ]] || fail "后台服务仍自带重复的 XADMaster"
+for license in LICENSE THIRD-PARTY-LICENSES.md libzip.txt XADMaster.txt UniversalDetector.txt Sparkle.txt; do
+  [[ -s "$APP/Contents/Resources/Licenses/$license" ]] || fail "应用包中缺少许可文件 $license"
+done
+for ext in FolderPreview ArchivePreview; do
+  [[ -d "$APP/Contents/PlugIns/$ext.appex" ]] || fail "缺少扩展 $ext"
+done
+echo "交付检查通过：$(du -sh "$APP" | cut -f1)  $APP"
+[[ "${SKIP_APPCAST:-0}" == 1 ]] && exit 0
+
+rm -rf "$OUT"
+mkdir -p "$OUT"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUT/PeekBox-$VERSION.zip"
+# 与压缩包同名的 .md 由 generate_appcast 当作这一版的更新说明；内嵌进 appcast，不必另外上传
+cp "$NOTES" "$OUT/PeekBox-$VERSION.md"
+# generate_appcast 用钥匙串中 PeekBox 账户的私钥签名；目录里只有这个版本，不生成差量包
+"$SPARKLE_BIN/generate_appcast" --account PeekBox --download-url-prefix "$URL_PREFIX" --maximum-deltas 0 \
+  --embed-release-notes "$OUT"
+rm "$OUT/PeekBox-$VERSION.md"
+grep -q '<description' "$OUT/appcast.xml" || fail "appcast 中没有更新说明"
+
+echo "已生成（$VERSION / $BUILD）："
+echo "  $OUT/PeekBox-$VERSION.zip"
+echo "  $OUT/appcast.xml"
+echo "下载地址：${URL_PREFIX}PeekBox-$VERSION.zip"

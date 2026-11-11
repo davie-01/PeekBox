@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.mars.PeekBox.Broker</string>
+	<key>BundleProgram</key>
+	<string>Contents/Helpers/PeekBoxBroker.app/Contents/MacOS/PeekBoxBroker</string>
+	<key>MachServices</key>
+	<dict>
+		<key>32N23TW5BT.com.mars.PeekBox.broker</key>
+		<true/>
+	</dict>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>com.mars.PeekBox</string>
+	</array>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+</dict>
+</plist>

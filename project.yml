@@ -1,0 +1,262 @@
+name: PeekBox
+
+options:
+  bundleIdPrefix: com.mars.PeekBox
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: 32N23TW5BT
+    # 免费团队：手动签名、不嵌入 provisioning profile（描述文件约 7 天过期）
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Apple Development"
+    PROVISIONING_PROFILE_SPECIFIER: ""
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: YES
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # Sparkle EdDSA 公钥；私钥在登录钥匙串（generate_keys --account PeekBox）
+    SPARKLE_PUBLIC_KEY: bfzUX01Fh3OcEFq87Y/HumT0N5i1ozZ+Czlv4uJ7Y7Y=
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "6"
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
+  PeekCore:
+    path: Packages/PeekCore
+  PeekUI:
+    path: Packages/PeekUI
+
+targets:
+  PeekBox:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+        excludes:
+          - "LaunchAgents/**"
+      - path: App/LaunchAgents/com.mars.PeekBox.Broker.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
+      # GPL / LGPL 等许可要求随二进制附带许可原文与版权声明：拷入 Contents/Resources/Licenses（关于页可打开）。
+      # 用复制文件阶段而不是脚本：作为构建输入被跟踪，内容变化时会重新签名。
+      # 只含随应用分发的组件；licenses/ 中 7-Zip、CMake、XcodeGen、libarchive 仅用于开发与测试
+      - path: LICENSE
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses
+      - path: THIRD-PARTY-LICENSES.md
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses
+      - path: licenses/libzip.txt
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses
+      - path: licenses/XADMaster.txt
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses
+      - path: licenses/XADMaster-source-notices.txt
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses
+      - path: licenses/UniversalDetector.txt
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses
+      - path: licenses/Sparkle.txt
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mars.PeekBox
+        PRODUCT_NAME: PeekBox
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # 下方脚本要修改已嵌入的后台服务包，Xcode 默认的脚本沙盒不允许
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: PeekBox
+        # 明确声明支持的语言：扩展本身只有显示名的中文资源，否则会被当成仅支持中文，连带资源包也选中文
+        CFBundleLocalizations: [en, zh-Hans]
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: "© 2026 PeekBox"
+        # 更新：只手动检查。地址始终指向发布仓库最新一个 Release 附带的 appcast.xml（发布步骤见 release.sh）；
+        # 开发测试时用 defaults 的 PeekBoxFeedURL 覆盖
+        SUFeedURL: https://github.com/davie-01/Peekbox/releases/latest/download/appcast.xml
+        SUEnableAutomaticChecks: false
+        SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
+        # 仅放行本地网络（localhost 测试更新源），不影响对外请求
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.mars.PeekBox
+            CFBundleTypeRole: Viewer
+            CFBundleURLSchemes: [peekbox]
+    entitlements:
+      path: App/PeekBox.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - 32N23TW5BT.com.mars.PeekBox
+    dependencies:
+      - target: FolderPreview
+      - target: ArchivePreview
+      - target: PeekBoxBroker
+        embed: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      - package: PeekCore
+      - package: Sparkle
+    # 后台服务包里自动嵌入了与主应用相同的 XADMaster / UniversalDetector（Mach-O UUID 相同），白占约 2 MB。
+    # Swift 包的二进制框架在后台服务 target 的所有构建阶段之后才嵌入，只能在主应用拷入后台服务包后删除，
+    # 再重新签名后台服务包；它运行时经 rpath 加载外层 Contents/Frameworks 中的同一份（主应用随后整体签名）
+    postBuildScripts:
+      - name: 后台服务复用主应用的框架
+        basedOnDependencyAnalysis: false
+        script: |
+          BROKER="$TARGET_BUILD_DIR/$WRAPPER_NAME/Contents/Helpers/PeekBoxBroker.app"
+          [ -d "$BROKER" ] || exit 0
+          for framework in XADMaster UniversalDetector; do
+            rm -rf "$BROKER/Contents/Frameworks/$framework.framework"
+          done
+          rmdir "$BROKER/Contents/Frameworks" 2>/dev/null || true
+          codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none \
+            --preserve-metadata=identifier,entitlements,flags,runtime "$BROKER"
+    scheme: {}
+
+  FolderPreview:
+    type: app-extension
+    platform: macOS
+    sources: [Extensions/FolderPreview]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mars.PeekBox.FolderPreview
+        PRODUCT_NAME: FolderPreview
+    info:
+      path: Extensions/FolderPreview/Info.plist
+      properties:
+        CFBundleDisplayName: PeekBox Folder Preview
+        # 明确声明支持的语言：扩展本身只有显示名的中文资源，否则会被当成仅支持中文，连带资源包也选中文
+        CFBundleLocalizations: [en, zh-Hans]
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewViewController
+          NSExtensionAttributes:
+            QLIsDataBasedPreview: false
+            QLSupportsSearchableItems: false
+            QLSupportedContentTypes:
+              - public.folder
+              - public.volume
+    entitlements:
+      path: Extensions/FolderPreview/FolderPreview.entitlements
+      properties: &extensionEntitlements
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - 32N23TW5BT.com.mars.PeekBox
+        # 实测：Quick Look 扩展沙盒默认拒绝查找以下 Mach 服务
+        # - Broker：App Group 前缀名不被放行
+        # - dragserver：拖放会话
+        # - ThumbnailsAgent：QLThumbnailGenerator（静默拒绝，表现为 NSCocoaErrorDomain 4099）
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - 32N23TW5BT.com.mars.PeekBox.broker
+          - com.apple.ensemble.dragserver
+          - com.apple.windowmanager.dragserver
+          - com.apple.quicklook.ThumbnailsAgent
+        # coredrag 是按进程查找（目标 Finder 的拖放端口），普通应用沙盒 application.sb
+        # 以 (local-name "com.apple.coredrag") 放行，Quick Look 扩展沙盒缺这一条
+        com.apple.security.temporary-exception.mach-lookup.local-name:
+          - com.apple.coredrag
+    dependencies:
+      - package: PeekCore
+      - package: PeekUI
+
+  ArchivePreview:
+    type: app-extension
+    platform: macOS
+    sources: [Extensions/ArchivePreview]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mars.PeekBox.ArchivePreview
+        PRODUCT_NAME: ArchivePreview
+    info:
+      path: Extensions/ArchivePreview/Info.plist
+      properties:
+        CFBundleDisplayName: PeekBox Archive Preview
+        # 明确声明支持的语言：扩展本身只有显示名的中文资源，否则会被当成仅支持中文，连带资源包也选中文
+        CFBundleLocalizations: [en, zh-Hans]
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewViewController
+          NSExtensionAttributes:
+            QLIsDataBasedPreview: false
+            QLSupportsSearchableItems: false
+            QLSupportedContentTypes:
+              - public.zip-archive
+              - public.tar-archive
+              - org.gnu.gnu-zip-tar-archive
+              - public.tar-bzip2-archive
+              - org.tukaani.tar-xz-archive
+              - org.gnu.gnu-zip-archive
+              - public.bzip2-archive
+              - org.tukaani.xz-archive
+              - org.7-zip.7-zip-archive
+              - com.rarlab.rar-archive
+    entitlements:
+      path: Extensions/ArchivePreview/ArchivePreview.entitlements
+      properties: *extensionEntitlements
+    dependencies:
+      - package: PeekCore
+      - package: PeekUI
+
+  # 后台服务是独立的小应用包（Contents/Helpers/PeekBoxBroker.app），有自己的应用 ID。
+  # 不能只是 Contents/MacOS 里的可执行文件：它以 NSApplication 运行（改名 / 写入面板），
+  # 系统会把它登记为"正在运行的 PeekBox"，打开主程序的请求被交给它自己（Dock 出现图标却没有设置窗口）
+  PeekBoxBroker:
+    type: application
+    platform: macOS
+    sources:
+      - path: Broker
+        excludes: [Info.plist]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mars.PeekBox.Broker
+        PRODUCT_NAME: PeekBoxBroker
+        INFOPLIST_FILE: Broker/Info.plist
+        SKIP_INSTALL: YES
+        # 共用外层主应用 Contents/Frameworks 中的第三方框架（见主应用 target 的 postBuildScripts）
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks @executable_path/../../../../Frameworks"
+    entitlements:
+      path: Broker/PeekBoxBroker.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - 32N23TW5BT.com.mars.PeekBox
+    dependencies:
+      - package: PeekCore
+      # 对话框组件（DialogKit）与预览共用
+      - package: PeekUI
