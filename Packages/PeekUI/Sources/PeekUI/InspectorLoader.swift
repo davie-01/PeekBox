@@ -10,7 +10,7 @@ enum InspectorLoader {
         case image, pdf, text, xmind, other
     }
 
-    /// XMind 文件是 ZIP 容器，新旧版本都在其中保存整张导图的缩略图
+    /// XMind 文件是 ZIP 容器，XMind 保存时新旧版本都会附带整张导图的缩略图
     private static let xmindExtensions: Set<String> = ["xmind", "xmt"]
     private static let xmindThumbnailPath = "Thumbnails/thumbnail.png"
 
@@ -102,17 +102,33 @@ enum InspectorLoader {
         return .image(image, pixelSize: pixelSize)
     }
 
-    /// 取 XMind 内嵌的缩略图（不依赖是否装有 XMind 及其缩略图扩展）；没有缩略图时返回 nil，由调用方退回系统缩略图
+    /// 优先取 XMind 内嵌的缩略图（不依赖是否装有 XMind 及其预览扩展）；没有缩略图时读导图内容显示为大纲。
+    /// 都读不出时返回 nil，由调用方退回系统缩略图
     private static func loadXMind(_ url: URL) -> Content? {
-        guard let reader = try? ZipArchive.open(url),
-              let item = reader.tree.items[xmindThumbnailPath],
-              !item.isDirectory, !item.isEncrypted, (item.size ?? 0) <= extractLimit,
-              let thumbnail = try? extract(item, from: reader, password: nil) else { return nil }
-        // 解码时已立即缓存像素，缩略图文件随即删除
-        defer { try? FileManager.default.removeItem(at: thumbnail.deletingLastPathComponent()) }
-        // 缩略图的像素尺寸不是文件本身的属性，不显示
-        guard case .image(let image, _) = loadImage(thumbnail) else { return nil }
-        return .image(image, pixelSize: nil)
+        guard let reader = try? ZipArchive.open(url) else { return nil }
+        if let thumbnail = extractXMindEntry(xmindThumbnailPath, from: reader) {
+            // 解码时已立即缓存像素，缩略图文件随即删除
+            defer { try? FileManager.default.removeItem(at: thumbnail.deletingLastPathComponent()) }
+            // 缩略图的像素尺寸不是文件本身的属性，不显示
+            if case .image(let image, _) = loadImage(thumbnail) { return .image(image, pixelSize: nil) }
+        }
+        let sources: [(path: String, parse: (Data) -> [XMindOutline.Sheet]?)] = [
+            ("content.json", XMindOutline.sheets(json:)), ("content.xml", XMindOutline.sheets(xml:)),
+        ]
+        for source in sources {
+            guard let file = extractXMindEntry(source.path, from: reader) else { continue }
+            defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+            guard let data = try? Data(contentsOf: file), let sheets = source.parse(data) else { continue }
+            let (text, truncated) = XMindOutline.text(of: sheets, limit: textLimit)
+            return .text(text, truncated: truncated)
+        }
+        return nil
+    }
+
+    private static func extractXMindEntry(_ path: String, from reader: ZipArchive) -> URL? {
+        guard let item = reader.tree.items[path], !item.isDirectory, !item.isEncrypted,
+              (item.size ?? 0) <= extractLimit else { return nil }
+        return try? extract(item, from: reader, password: nil)
     }
 
     /// 第一页按显示尺寸渲染，不依赖系统缩略图服务
