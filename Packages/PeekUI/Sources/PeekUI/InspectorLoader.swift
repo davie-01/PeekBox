@@ -7,8 +7,12 @@ import PeekCore
 /// 检查器的后台加载：图片缩小解码、文本只读开头部分、压缩包条目提取到临时目录
 enum InspectorLoader {
     enum Kind: Sendable {
-        case image, pdf, text, other
+        case image, pdf, text, xmind, other
     }
+
+    /// XMind 文件是 ZIP 容器，新旧版本都在其中保存整张导图的缩略图
+    private static let xmindExtensions: Set<String> = ["xmind", "xmt"]
+    private static let xmindThumbnailPath = "Thumbnails/thumbnail.png"
 
     enum Content: @unchecked Sendable {
         case image(CGImage, pixelSize: CGSize?)
@@ -25,7 +29,9 @@ enum InspectorLoader {
 
     static func kind(ofName name: String) -> Kind {
         let ext = (name as NSString).pathExtension
-        guard !ext.isEmpty, let type = UTType(filenameExtension: ext) else { return .other }
+        guard !ext.isEmpty else { return .other }
+        if xmindExtensions.contains(ext.lowercased()) { return .xmind }
+        guard let type = UTType(filenameExtension: ext) else { return .other }
         if type.conforms(to: .image) { return .image }
         if type.conforms(to: .pdf) { return .pdf }
         if type.conforms(to: .text) || type.conforms(to: .sourceCode) || type.conforms(to: .propertyList) { return .text }
@@ -41,6 +47,8 @@ enum InspectorLoader {
             return loadPDF(url) ?? .none
         case .text:
             return loadText(url) ?? .none
+        case .xmind:
+            return loadXMind(url) ?? .none
         case .other:
             guard let head = try? readHead(url, limit: 4096), looksLikeText(head) else { return .none }
             return loadText(url) ?? .none
@@ -92,6 +100,19 @@ enum InspectorLoader {
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
         return .image(image, pixelSize: pixelSize)
+    }
+
+    /// 取 XMind 内嵌的缩略图（不依赖是否装有 XMind 及其缩略图扩展）；没有缩略图时返回 nil，由调用方退回系统缩略图
+    private static func loadXMind(_ url: URL) -> Content? {
+        guard let reader = try? ZipArchive.open(url),
+              let item = reader.tree.items[xmindThumbnailPath],
+              !item.isDirectory, !item.isEncrypted, (item.size ?? 0) <= extractLimit,
+              let thumbnail = try? extract(item, from: reader, password: nil) else { return nil }
+        // 解码时已立即缓存像素，缩略图文件随即删除
+        defer { try? FileManager.default.removeItem(at: thumbnail.deletingLastPathComponent()) }
+        // 缩略图的像素尺寸不是文件本身的属性，不显示
+        guard case .image(let image, _) = loadImage(thumbnail) else { return nil }
+        return .image(image, pixelSize: nil)
     }
 
     /// 第一页按显示尺寸渲染，不依赖系统缩略图服务
