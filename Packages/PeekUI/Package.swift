@@ -6,7 +6,7 @@ let package = Package(
     defaultLocalization: "en",
     platforms: [.macOS("26.0")],
     products: [
-        .library(name: "PeekUI", targets: ["PeekUI"])
+        .library(name: "PeekUI", type: .dynamic, targets: ["PeekUI"])
     ],
     dependencies: [
         .package(path: "../PeekCore")

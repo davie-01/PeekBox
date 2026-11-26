@@ -108,13 +108,13 @@ for pid in "${PIDS[@]}"; do wait "$pid"; done
 
 # 动态框架：两个预览扩展与后台服务都经 rpath 加载主应用 Contents/Frameworks 中的同一份（与 XADMaster 相同），
 # 不在每个可执行文件里各链一份。全部目标文件直接链入，各 handler 的静态注册代码随之保留；
-# 只导出桥接接口，其余死代码剥离
+# 只导出桥接接口，其余死代码剥离；-x 去掉局部符号（第三方库不在其内部调试，Debug 与发布共用这一份）
 FRAMEWORK="$WORK/CSevenZip.framework"
 rm -rf "$FRAMEWORK"
 mkdir -p "$FRAMEWORK/Versions/A/Headers" "$FRAMEWORK/Versions/A/Modules" "$FRAMEWORK/Versions/A/Resources"
 xcrun clang++ -dynamiclib -arch arm64 -mmacosx-version-min=26.0 -isysroot "$SDK" "$OBJ"/*.o \
   -install_name @rpath/CSevenZip.framework/Versions/A/CSevenZip \
-  -compatibility_version 1 -current_version "$VERSION" -dead_strip \
+  -compatibility_version 1 -current_version "$VERSION" -dead_strip -Wl,-x \
   -exported_symbols_list <(print -l _psz_open _psz_close _psz_item_count _psz_item _psz_format \
     _psz_volume_name _psz_extract _psz_version _psz_free) \
   -o "$FRAMEWORK/Versions/A/CSevenZip"

@@ -132,7 +132,13 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # PeekCore / PeekUI 是动态框架，只嵌入主应用的 Contents/Frameworks 一份；
+      # 两个扩展与后台服务不嵌入，经 rpath 加载这一份（原先各自静态链入，同样的代码有三份）
       - package: PeekCore
+        embed: true
+      - package: PeekUI
+        embed: true
+        link: false
       - package: Sparkle
     # 后台服务包里自动嵌入了与主应用相同的 XADMaster / UniversalDetector / CSevenZip（Mach-O UUID 相同），白占约 3 MB。
     # Swift 包的二进制框架在后台服务 target 的所有构建阶段之后才嵌入，只能在主应用拷入后台服务包后删除，

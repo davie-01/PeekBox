@@ -40,6 +40,8 @@ for name in XADMaster UniversalDetector; do
     echo "错误：未生成 $name.framework" >&2
     exit 1
   fi
+  # 去掉局部符号，保留导出符号（第三方库不在其内部调试，Debug 与发布共用这一份）
+  xcrun strip -x "$PRODUCTS/$name.framework/Versions/A/$name"
   rm -rf "$VENDOR/$name.xcframework"
   xcodebuild -create-xcframework -framework "$PRODUCTS/$name.framework" \
     -output "$VENDOR/$name.xcframework" >/dev/null

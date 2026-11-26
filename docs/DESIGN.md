@@ -82,7 +82,7 @@ flowchart LR
 
 - Quick Look 扩展在系统宿主中运行并受沙盒约束。扩展通过命名 `NSXPCConnection` 调用 `PeekBoxBroker`，双方都用代码签名要求校验对方属于同一开发团队。
 - 主应用、扩展和后台服务通过 App Group 共享设置文件（`settings.plist`）。`SettingsStore` 用文件锁保护跨进程的读改写；沙盒扩展对容器只有读权限，写入交给后台服务代办。
-- 发行构建把后台服务放在 `PeekBox.app/Contents/Helpers/PeekBoxBroker.app`，与两个扩展一样经 rpath 复用主应用 `Contents/Frameworks/` 中的 XADMaster、UniversalDetector 与 CSevenZip。
+- 发行构建把后台服务放在 `PeekBox.app/Contents/Helpers/PeekBoxBroker.app`。PeekCore 与 PeekUI 是动态框架，与 XADMaster、UniversalDetector、CSevenZip 一样只嵌入主应用 `Contents/Frameworks/` 一份；两个扩展与后台服务不自带框架，经 rpath 加载这一份。
 - 使用免费开发团队签名，不嵌入描述文件；当前发行包未经 Apple 公证。
 - 更换开发团队时，以 `project.yml` 为工程配置源，核对主应用、扩展和后台服务的 entitlements、`App/LaunchAgents/com.mars.PeekBox.Broker.plist`，以及 `Packages/PeekCore/Sources/PeekCore/PeekShared.swift`。团队前缀、App Group、Mach 服务注册名与查询名必须一致。重新生成工程后，实测两个扩展以及主应用到后台服务的连接。
 - Sparkle 的 EdDSA 更新签名与 macOS 代码签名相互独立。复用已有更新渠道时，要保留受现有安装信任的 Sparkle 私钥；为 fork 建立自己的更新渠道时，同步配置公钥（`SPARKLE_PUBLIC_KEY`）和 `SUFeedURL`。
@@ -170,6 +170,7 @@ PeekBox/
 
 - `Scripts/generate-project.sh` 从 `project.yml` 生成工程并修正 Icon Composer 资源类型。升级依赖时，核对 `build-libzip.sh` 的 SHA-256、`build-xadmaster.sh` 与 `build-7zip.sh` 的固定提交（7-Zip 升级后确认补丁仍能应用）和 `project.yml` 中的 Sparkle 版本，并同步更新 [第三方许可](../THIRD-PARTY-LICENSES.md)。
 - `swift test --package-path Packages/PeekCore` 运行核心测试，覆盖归档树、格式矩阵与编码、磁盘镜像（用 hdiutil 现场生成各种 DMG / ISO / UDF）、拷到文件夹与隔离属性、ZIP 写入与交叉校验、文件身份与一致性、分卷识别、设置并发写入和导入内存占用。Finder 实机回归应覆盖空格预览、滚动、拖出与拖入、DMG 中的 App 拖到"应用程序"替身、加密解锁、分卷、两个扩展的注册、后台服务按需启动与退出，以及其他预览扩展同时启用时的提示。
-- 发布前在 `docs/发布说明/<版本号>.md` 写好更新说明，再运行 `Scripts/release.sh <版本号> <构建号>`。脚本构建 arm64 Release，检查签名、图标、后台服务、两个扩展，确认不含 Debug 产物和描述文件，然后打包 ZIP、把更新说明嵌入 appcast 并签名。构建号必须大于此前发布过的任何版本。
+- 发布前在 `docs/发布说明/<版本号>.md` 写好更新说明，再运行 `Scripts/release.sh <版本号> <构建号>`。脚本构建 arm64 Release，检查签名、图标、后台服务、两个扩展，确认不含 Debug 产物和描述文件，然后打包 ZIP、把更新说明嵌入 appcast 并签名。
+- 发布包要瘦身，Debug 版照常构建：`release.sh` 在签名前去除符号、链接时裁剪死代码、资源目录按体积编译，第三方动态框架在各自构建脚本中只保留导出符号。交付检查确认二进制不含调试符号、框架只有一份且各可执行文件的依赖都能按 rpath 找到。去除的调试信息存为 dSYM（`build/releases/<版本号>/PeekBox-<版本号>-dSYMs.zip`），留在本机用来符号化崩溃日志，不上传。构建号必须大于此前发布过的任何版本。
 - 把 ZIP 和 appcast 上传到标签为 `v<版本号>` 的 GitHub Release 并设为 Latest；应用的更新地址（`SUFeedURL`）指向最新 Release 附带的 appcast。用旧版本实测更新，再检查应用、两个扩展和后台服务是否正常。
 - 构建时把 `LICENSE`、`THIRD-PARTY-LICENSES.md` 与 `licenses/` 中的许可原文拷入 `PeekBox.app/Contents/Resources/Licenses/`，「关于」页可直接打开，`release.sh` 的交付检查会确认它们存在。发行时还需提供与二进制对应的源码，见 [第三方许可](../THIRD-PARTY-LICENSES.md)。

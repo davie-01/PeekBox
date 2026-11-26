@@ -6,7 +6,7 @@ let package = Package(
     defaultLocalization: "en",
     platforms: [.macOS("26.0")],
     products: [
-        .library(name: "PeekCore", targets: ["PeekCore"])
+        .library(name: "PeekCore", type: .dynamic, targets: ["PeekCore"])
     ],
     targets: [
         // 以下由 Scripts/build-libzip.sh、Scripts/build-xadmaster.sh、Scripts/build-7zip.sh 生成，不提交仓库
