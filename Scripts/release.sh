@@ -119,8 +119,6 @@ echo "交付检查通过：$(du -sh "$APP" | cut -f1)  $APP"
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
-# 发布的二进制已去除符号，崩溃日志靠这些 dSYM 还原函数名与行号：只留本机，不上传
-( cd "$DERIVED/Build/Products/Release" && zip -qry "$OUT/PeekBox-$VERSION-dSYMs.zip" *.dSYM(/) )
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUT/PeekBox-$VERSION.zip"
 # 与压缩包同名的 .md 由 generate_appcast 当作这一版的更新说明；内嵌进 appcast，不必另外上传
 cp "$NOTES" "$OUT/PeekBox-$VERSION.md"
@@ -129,6 +127,9 @@ cp "$NOTES" "$OUT/PeekBox-$VERSION.md"
   --embed-release-notes "$OUT"
 rm "$OUT/PeekBox-$VERSION.md"
 grep -q '<description' "$OUT/appcast.xml" || fail "appcast 中没有更新说明"
+# 发布的二进制已去除符号，崩溃日志靠这些 dSYM 还原函数名与行号：只留本机，不上传。
+# 在 generate_appcast 之后才放进输出目录，否则它会把这个压缩包也当作更新包去扫描
+( cd "$DERIVED/Build/Products/Release" && zip -qry "$OUT/PeekBox-$VERSION-dSYMs.zip" *.dSYM(/) )
 
 echo "已生成（$VERSION / $BUILD）："
 echo "  $OUT/PeekBox-$VERSION.zip"
