@@ -40,6 +40,8 @@ flowchart LR
 - **窗口尺寸由系统按项目记忆**。预览不主动修改窗口大小，否则同一项目再次打开时视图与窗口尺寸不一致，整个预览无法点击。
 - **扩展在沙盒中只能读被预览的项目**。打开、拷贝、移到废纸篓、写入 ZIP，以及读取同目录的其他分卷，都交给后台服务完成。
 
+界面统一不画蓝色焦点环（开启"键盘导航"后按钮、复选框也会取得焦点）。在窗口层统一处理，新增页面和控件不需要再单独设置：设置窗口在根视图使用 `.focusEffectDisabled()`；后台服务的对话框面板由 `DialogPanel` 创建，控件成为第一响应者时即不画焦点环；预览内的弹出框都经 `makePopover` 创建，显示时对其窗口统一处理（见 `FocusRing.swift`）。
+
 ### 浏览与提取
 
 - 两个扩展复用 `BrowserViewController`。`FolderSource` 与 `ArchiveSource` 实现 `EntrySource`，预览层通过统一的条目模型浏览目录和归档，只列举当前展开的层级。
@@ -148,7 +150,8 @@ PeekBox/
 │           ├── BrowserViewController+*.swift        操作、图标视图、检查器、密码、快速设置、ZIP 写入、文件监视、条目图标、拷到文件夹
 │           ├── ArchivePromiseDelegate.swift         拖出（File Promise）
 │           ├── InspectorView.swift / InspectorLoader.swift   检查器
-│           └── DialogKit.swift                      弹出框与面板组件
+│           ├── DialogKit.swift                      弹出框与面板组件
+│           └── FocusRing.swift                      统一去除面板与弹出框的焦点环
 ├── Scripts/
 │   ├── build-libzip.sh           下载固定版本 libzip、校验 SHA-256、构建 XCFramework
 │   ├── build-xadmaster.sh        按固定提交构建 XADMaster 与 UniversalDetector

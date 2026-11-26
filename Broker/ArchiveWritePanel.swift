@@ -67,7 +67,6 @@ final class ArchiveWritePanel: NSObject, NSWindowDelegate {
                 accessories: [progressRow], trailingButtons: [cancelButton])
         }
         progressPanel.contentView = progressContent
-        applyAll.focusRingType = .none
 
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(250))

@@ -13,6 +13,9 @@ struct PeekBoxApp: App {
         // 有窗口就交给现有窗口，没有就新建一个
         WindowGroup("PeekBox", id: "main") {
             SettingsView(model: model)
+                // 整个设置窗口不画蓝色焦点环（开启"键盘导航"后按钮等会取得焦点）：在根视图统一关闭，
+                // 以后新增的页面与控件同样生效，不要再逐个控件处理
+                .focusEffectDisabled()
                 .onOpenURL { model.handle($0) }
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }

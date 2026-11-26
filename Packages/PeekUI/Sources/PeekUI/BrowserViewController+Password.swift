@@ -167,6 +167,12 @@ extension BrowserViewController {
 }
 
 extension BrowserViewController: NSPopoverDelegate {
+    /// 弹出框里的控件一律不画焦点环（见 FocusRing.swift）；所有弹出框都经 makePopover 创建，以此为代理
+    public func popoverDidShow(_ notification: Notification) {
+        guard let window = (notification.object as? NSPopover)?.contentViewController?.view.window else { return }
+        FocusRing.suppress(in: window)
+    }
+
     /// 弹出框关闭后把焦点还给显示中的列表 / 图标视图（选中项保持强调色，焦点不落到按钮上）
     public func popoverDidClose(_ notification: Notification) {
         view.window?.makeFirstResponder(PeekPreferences.viewMode == .icons ? collectionView : outlineView)

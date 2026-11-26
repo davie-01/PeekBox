@@ -260,7 +260,7 @@ public final class DialogContentView: NSView {
 }
 
 /// 永远不取得键盘焦点的面板
-private final class NonKeyPanel: NSPanel {
+private final class NonKeyPanel: FocusRinglessPanel {
     override var canBecomeKey: Bool { false }
 }
 
@@ -269,7 +269,8 @@ private final class NonKeyPanel: NSPanel {
 public enum DialogPanel {
     /// canBecomeKey 为 false 时面板不取得键盘焦点，预览窗口保持可操作（按钮须自绘，见 DialogButton）
     public static func make(canBecomeKey: Bool = true) -> NSPanel {
-        let panelClass: NSPanel.Type = canBecomeKey ? NSPanel.self : NonKeyPanel.self
+        // 两种面板都不画焦点环（见 FocusRing.swift）
+        let panelClass: NSPanel.Type = canBecomeKey ? FocusRinglessPanel.self : NonKeyPanel.self
         let panel = panelClass.init(contentRect: NSRect(x: 0, y: 0, width: 400, height: 160),
                                     styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
                                     backing: .buffered, defer: false)
