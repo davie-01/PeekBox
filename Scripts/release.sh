@@ -48,6 +48,9 @@ xcodebuild -project PeekBox.xcodeproj -scheme PeekBox -configuration Release \
   build -quiet
 
 APP="$DERIVED/Build/Products/Release/PeekBox.app"
+# 增量构建不会更新应用包目录本身的修改时间，打包与 Sparkle 安装又原样保留：系统图标缓存据此认为应用没变，
+# 用户更新后可能仍显示旧版图标。更新包目录的时间（不影响代码签名）
+touch "$APP"
 if find "$APP" -name embedded.provisionprofile | grep -q .; then
   echo "错误：产物中包含 embedded.provisionprofile" >&2
   exit 1

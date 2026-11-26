@@ -34,6 +34,9 @@ pkill -x ArchivePreview 2>/dev/null || true
 
 rm -rf "$DEST"
 ditto "$PRODUCT" "$DEST"
+# 增量构建不会更新应用包目录本身的修改时间，ditto 又原样保留：系统图标缓存据此认为应用没变，
+# 换了图标后应用内（NSApp.applicationIconImage）和 Finder 仍显示旧图标。安装后更新包目录的时间
+touch "$DEST"
 
 # 只保留 /Applications 这一份：构建目录（本脚本的、Xcode 的）和安装中间产物里的副本带着同 ID 的扩展，
 # 系统可能启用它们，预览运行的就不是刚安装的代码；peekbox: 链接也可能被交给它们。只注销登记，不删除文件
