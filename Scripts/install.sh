@@ -14,6 +14,7 @@ cd "$ROOT"
 [[ -d Packages/PeekCore/Vendor/libzip.xcframework ]] || ./Scripts/build-libzip.sh
 [[ -d Packages/PeekCore/Vendor/XADMaster.xcframework ]] || ./Scripts/build-xadmaster.sh
 [[ -d Packages/PeekCore/Vendor/CSevenZip.xcframework ]] || ./Scripts/build-7zip.sh
+[[ -d Packages/PeekCore/Vendor/Sparkle.xcframework ]] || ./Scripts/build-sparkle.sh
 ./Scripts/generate-project.sh
 
 xcodebuild -project PeekBox.xcodeproj -scheme PeekBox -configuration Debug \
@@ -34,9 +35,12 @@ pkill -x ArchivePreview 2>/dev/null || true
 
 rm -rf "$DEST"
 ditto "$PRODUCT" "$DEST"
-# 增量构建不会更新应用包目录本身的修改时间，ditto 又原样保留：系统图标缓存据此认为应用没变，
-# 换了图标后应用内（NSApp.applicationIconImage）和 Finder 仍显示旧图标。安装后更新包目录的时间
-touch "$DEST"
+# 应用包目录的修改时间设为 10 分钟前（每次安装各不相同）：
+# - 增量构建不会更新包目录本身的时间，ditto 又原样保留：不改则系统图标缓存认为应用没变，换了图标仍显示旧的；
+# - 不能设为当前时间：LaunchServices 认为在修改后约 5 分钟内做的登记可能不完整，此后每次经系统启动主应用
+#   都会重新登记一次，并结束正在运行的预览扩展（从预览点设置后预览变回系统默认）。往前设 10 分钟，
+#   下面的登记即为稳定记录，扩展中断只发生在安装这一步
+touch -t "$(date -v-10M +%Y%m%d%H%M.%S)" "$DEST"
 
 # 只保留 /Applications 这一份：构建目录（本脚本的、Xcode 的）和安装中间产物里的副本带着同 ID 的扩展，
 # 系统可能启用它们，预览运行的就不是刚安装的代码；peekbox: 链接也可能被交给它们。只注销登记，不删除文件
