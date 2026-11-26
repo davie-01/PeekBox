@@ -22,8 +22,8 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # Sparkle EdDSA 公钥；私钥在登录钥匙串（generate_keys --account PeekBox）
     SPARKLE_PUBLIC_KEY: bfzUX01Fh3OcEFq87Y/HumT0N5i1ozZ+Czlv4uJ7Y7Y=
-    MARKETING_VERSION: "1.0.6"
-    CURRENT_PROJECT_VERSION: "13"
+    MARKETING_VERSION: "1.0.7"
+    CURRENT_PROJECT_VERSION: "14"
 
 packages:
   PeekCore:
