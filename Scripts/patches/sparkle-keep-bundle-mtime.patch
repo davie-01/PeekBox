@@ -1,0 +1,25 @@
+diff --git a/Autoupdate/SUPlainInstaller.m b/Autoupdate/SUPlainInstaller.m
+index 7db6c72..287287f 100644
+--- a/Autoupdate/SUPlainInstaller.m
++++ b/Autoupdate/SUPlainInstaller.m
+@@ -79,14 +79,12 @@ - (void)_performInitialInstallationWithFileManager:(SUFileManager *)fileManager
+         progress(7/11.0);
+     }
+     
+-    // Register the new bundle with LaunchServices and the system
+-    NSError *touchError = nil;
+-    if (![fileManager updateModificationAndAccessTimeOfItemAtURL:newBundleURL error:&touchError]) {
+-        // Not a fatal error, but a pretty unfortunate one
+-        SULog(SULogLevelError, @"Failed to update modification and access time of new app at %@", newBundleURL.path);
+-        SULog(SULogLevelError, @"Error: %@", touchError);
+-    }
+-    
++    // PeekBox: keep the modification time the new bundle carries from the archive (set when the release was built)
++    // instead of touching it to "now". LaunchServices treats a registration made within ~5 minutes of the bundle's
++    // modification time as possibly incomplete and re-registers the app on every launch until one happens later;
++    // each re-registration also terminates the app's running Quick Look extensions. The swapped-in bundle is a new
++    // file node, so the system still notices the new version without the touch.
++
+     if (progress) {
+         progress(8/11.0);
+     }

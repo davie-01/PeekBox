@@ -85,6 +85,7 @@ cd Peekbox
 ./Scripts/build-libzip.sh
 ./Scripts/build-xadmaster.sh
 ./Scripts/build-7zip.sh
+./Scripts/build-sparkle.sh
 
 # 从 project.yml 生成 Xcode 工程，并修正 AppIcon.icon 的文件类型。
 ./Scripts/generate-project.sh

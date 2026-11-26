@@ -85,6 +85,7 @@ cd Peekbox
 ./Scripts/build-libzip.sh
 ./Scripts/build-xadmaster.sh
 ./Scripts/build-7zip.sh
+./Scripts/build-sparkle.sh
 
 # Generate the Xcode project from project.yml and fix the file type of AppIcon.icon.
 ./Scripts/generate-project.sh

@@ -96,8 +96,8 @@ flowchart LR
 | Swift 6、AppKit、SwiftUI | Swift 组织共享逻辑与并发。AppKit 提供 Quick Look 内的原生表格、图标和拖放。SwiftUI 用于设置窗口。 |
 | Quick Look、NSXPC、SMAppService | 复用 Finder 的空格键入口，把文件操作委托给用户会话中的后台服务，由系统维护注册状态。 |
 | libzip、XADMaster、UniversalDetector、7-Zip | libzip 处理 ZIP 读取和写入。XADMaster 提供其他格式与分卷读取。UniversalDetector 识别旧编码文件名。7-Zip 读取磁盘镜像与文件系统。 |
-| XcodeGen、Swift Package Manager、CMake | `project.yml` 生成应用与扩展工程，SwiftPM 管理共享模块和 Sparkle，CMake 构建固定版本的 libzip。 |
-| Sparkle 2 | 只在用户点「检查更新」时读取 GitHub Releases 上的 appcast，校验 EdDSA 签名后安装，并显示每个版本的更新说明。 |
+| XcodeGen、Swift Package Manager、CMake | `project.yml` 生成应用与扩展工程，SwiftPM 管理共享模块，CMake 构建固定版本的 libzip。 |
+| Sparkle 2 | 只在用户点「检查更新」时读取 GitHub Releases 上的 appcast，校验 EdDSA 签名后安装，并显示每个版本的更新说明。从固定版本源码编译并打补丁：安装更新时保留新应用包的修改时间（见下方「构建、验证与发布」）。 |
 
 目标平台为 macOS 26 及以上、Apple 芯片（arm64）。版本号由 `MARKETING_VERSION` 管理，Sparkle 比较的构建号来自 `CURRENT_PROJECT_VERSION`。
 
@@ -156,6 +156,8 @@ PeekBox/
 │   ├── build-libzip.sh           下载固定版本 libzip、校验 SHA-256、构建 XCFramework
 │   ├── build-xadmaster.sh        按固定提交构建 XADMaster 与 UniversalDetector
 │   ├── build-7zip.sh             按固定提交编译 7-Zip 的读取部分与桥接层，打补丁，构建 CSevenZip 动态框架
+│   ├── build-sparkle.sh          按固定提交编译 Sparkle 与发布工具（generate_appcast 等），打补丁（patches/）
+│   ├── patches/                  对 Sparkle 的补丁及说明
 │   ├── generate-project.sh       生成 Xcode 工程并修正图标文件类型
 │   ├── install.sh                构建 Debug 版并安装到「应用程序」
 │   ├── release.sh                构建 Release、交付检查、打包并生成 appcast
@@ -171,9 +173,10 @@ PeekBox/
 
 ## 构建、验证与发布
 
-- `Scripts/generate-project.sh` 从 `project.yml` 生成工程并修正 Icon Composer 资源类型。升级依赖时，核对 `build-libzip.sh` 的 SHA-256、`build-xadmaster.sh` 与 `build-7zip.sh` 的固定提交（7-Zip 升级后确认补丁仍能应用）和 `project.yml` 中的 Sparkle 版本，并同步更新 [第三方许可](../THIRD-PARTY-LICENSES.md)。
+- `Scripts/generate-project.sh` 从 `project.yml` 生成工程并修正 Icon Composer 资源类型。升级依赖时，核对 `build-libzip.sh` 的 SHA-256、`build-xadmaster.sh`、`build-7zip.sh` 与 `build-sparkle.sh` 的固定提交（7-Zip、Sparkle 升级后确认补丁仍能应用），并同步更新 [第三方许可](../THIRD-PARTY-LICENSES.md)。
 - `swift test --package-path Packages/PeekCore` 运行核心测试，覆盖归档树、格式矩阵与编码、磁盘镜像（用 hdiutil 现场生成各种 DMG / ISO / UDF）、拷到文件夹与隔离属性、ZIP 写入与交叉校验、文件身份与一致性、分卷识别、设置并发写入和导入内存占用。Finder 实机回归应覆盖空格预览、滚动、拖出与拖入、DMG 中的 App 拖到"应用程序"替身、加密解锁、分卷、两个扩展的注册、后台服务按需启动与退出，以及其他预览扩展同时启用时的提示。
 - 发布前在 `docs/发布说明/<版本号>.md` 写好更新说明，再运行 `Scripts/release.sh <版本号> <构建号>`。脚本构建 arm64 Release，检查签名、图标、后台服务、两个扩展，确认不含 Debug 产物和描述文件，然后打包 ZIP、把更新说明嵌入 appcast 并签名。
 - 发布包要瘦身，Debug 版照常构建：`release.sh` 在签名前去除符号、链接时裁剪死代码、资源目录按体积编译，第三方动态框架在各自构建脚本中只保留导出符号。交付检查确认二进制不含调试符号、框架只有一份且各可执行文件的依赖都能按 rpath 找到。去除的调试信息存为 dSYM（`build/releases/<版本号>/PeekBox-<版本号>-dSYMs.zip`），留在本机用来符号化崩溃日志，不上传。构建号必须大于此前发布过的任何版本。
+- 安装与更新后启动主应用不能打断预览。LaunchServices 认为在应用包修改后约 5 分钟内做的登记可能不完整，之后每次经系统启动都会重新登记一次，直到某次启动晚于修改 5 分钟；每次重新登记都会结束该应用正在运行的预览扩展，预览退回系统默认。因此应用包目录的修改时间要早于登记至少 5 分钟：`release.sh` 设为打包时刻（每个版本不同，也让系统图标缓存刷新），解压、Finder 拷贝原样保留；Sparkle 安装更新时会把它改成当前时间，补丁（`Scripts/patches/sparkle-keep-bundle-mtime.patch`）去掉这一步，交付检查确认嵌入的是补丁版；`install.sh` 把开发安装设为 10 分钟前。注意安装更新的是旧版本自带的 Sparkle。
 - 把 ZIP 和 appcast 上传到标签为 `v<版本号>` 的 GitHub Release 并设为 Latest；应用的更新地址（`SUFeedURL`）指向最新 Release 附带的 appcast。用旧版本实测更新，再检查应用、两个扩展和后台服务是否正常。
 - 构建时把 `LICENSE`、`THIRD-PARTY-LICENSES.md` 与 `licenses/` 中的许可原文拷入 `PeekBox.app/Contents/Resources/Licenses/`，「关于」页可直接打开，`release.sh` 的交付检查会确认它们存在。发行时还需提供与二进制对应的源码，见 [第三方许可](../THIRD-PARTY-LICENSES.md)。

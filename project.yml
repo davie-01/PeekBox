@@ -26,9 +26,6 @@ settings:
     CURRENT_PROJECT_VERSION: "11"
 
 packages:
-  Sparkle:
-    url: https://github.com/sparkle-project/Sparkle
-    exactVersion: 2.10.1
   PeekCore:
     path: Packages/PeekCore
   PeekUI:
@@ -139,7 +136,10 @@ targets:
       - package: PeekUI
         embed: true
         link: false
-      - package: Sparkle
+      # Sparkle 由 Scripts/build-sparkle.sh 从源码编译并打补丁（安装更新时不改新应用包的修改时间），
+      # 不用 Swift Package 的预编译包
+      - framework: Packages/PeekCore/Vendor/Sparkle.xcframework
+        embed: true
     # 后台服务包里自动嵌入了与主应用相同的 XADMaster / UniversalDetector / CSevenZip（Mach-O UUID 相同），白占约 3 MB。
     # Swift 包的二进制框架在后台服务 target 的所有构建阶段之后才嵌入，只能在主应用拷入后台服务包后删除，
     # 再重新签名后台服务包；它运行时经 rpath 加载外层 Contents/Frameworks 中的同一份（主应用随后整体签名）

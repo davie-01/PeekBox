@@ -10,7 +10,7 @@ PeekBox 自有代码采用 [GNU GPL 第 3 版](LICENSE)（GPL-3.0-only）。第�
 | XADMaster | `7cb9ee0abbb163f261e4cb74501e15067032319c` | 7z、RAR、TAR 等归档的浏览和提取。以动态框架分发。 | 主体为 GNU LGPL v2.1，主要源码头声明 v2.1 或更高版本。内嵌组件按各自声明。 | [固定源码](https://github.com/MacPaw/XADMaster/tree/7cb9ee0abbb163f261e4cb74501e15067032319c) · [原文](licenses/XADMaster.txt) |
 | 7-Zip | 26.06（`d3296e3`） | 磁盘镜像与文件系统（DMG、ISO、UDF、HFS+、APFS、FAT、NTFS、ext 等）的浏览和提取。只编译读取相关的格式与解码器，以动态框架 `CSevenZip.framework` 分发；框架中还包含 PeekBox 自有的桥接代码。 | 所编译的代码为 GNU LGPL v2.1 或更高版本，其中 LZFSE、Zstandard 解码为 BSD-3-Clause，XXH64 为 BSD-2-Clause。 | [固定源码](https://github.com/ip7z/7zip/tree/d3296e39e1f1f92c7b41c0c3848e65640428d42d) · [原文与说明](licenses/7-Zip.txt) |
 | UniversalDetector | `4eb832d999628edcd3d134e46bd35357c8c99a85` | 字符编码检测。以动态框架分发。 | 主体为 GNU LGPL v2.1，主要源码头声明 v2.1 或更高版本。部分 Mozilla 文件提供多许可证选项。 | [固定源码](https://github.com/MacPaw/universal-detector/tree/4eb832d999628edcd3d134e46bd35357c8c99a85) · [原文](licenses/UniversalDetector.txt) |
-| Sparkle | 2.10.1 | 检查和安装更新。以动态框架及其辅助程序分发。 | 主体为 MIT。附带组件见下表。 | [版本源码](https://github.com/sparkle-project/Sparkle/tree/2.10.1) · [完整声明](licenses/Sparkle.txt) |
+| Sparkle | 2.10.1（PeekBox 修改版） | 检查和安装更新。以动态框架及其辅助程序分发。 | 主体为 MIT。附带组件见下表。 | [版本源码](https://github.com/sparkle-project/Sparkle/tree/2.10.1) · [完整声明](licenses/Sparkle.txt) |
 
 ## 依赖内嵌代码
 
@@ -44,6 +44,8 @@ PeekBox 只编译 [`Scripts/build-7zip.sh`](Scripts/build-7zip.sh) 列出的源�
 UniversalDetector 内含 Mozilla Universal Charset Detector 的代码。原始文件头提供 MPL 1.1、GPL v2 或更高版本、LGPL v2.1 或更高版本的选择。各文件的版权和授权以源码头为准。 [固定源码及声明](https://github.com/MacPaw/universal-detector/tree/4eb832d999628edcd3d134e46bd35357c8c99a85/universalchardet)
 
 ### Sparkle
+
+PeekBox 用 [`Scripts/build-sparkle.sh`](Scripts/build-sparkle.sh) 从固定提交的源码编译 Sparkle，并应用补丁 [`sparkle-keep-bundle-mtime.patch`](Scripts/patches/sparkle-keep-bundle-mtime.patch)：安装更新时不再把新应用包的修改时间改成当前时间。修改部分与 Sparkle 一样采用 MIT 许可。
 
 | 组件 | 许可 | 来源与声明 |
 | --- | --- | --- |

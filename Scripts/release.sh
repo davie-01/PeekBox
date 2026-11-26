@@ -21,7 +21,8 @@ ROOT=${0:A:h:h}
 DERIVED="$ROOT/build/release-derived"
 # 每个版本单独一个目录：appcast 只写这一个版本，下载前缀不会错套到其他版本上
 OUT="$ROOT/build/releases/$VERSION"
-SPARKLE_BIN="$ROOT/build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin"
+# generate_appcast 等工具与 Sparkle 框架一起由 build-sparkle.sh 从源码编译
+SPARKLE_BIN="$ROOT/build/vendor/sparkle/bin"
 NOTES="$ROOT/docs/发布说明/$VERSION.md"
 
 cd "$ROOT"
@@ -30,11 +31,8 @@ cd "$ROOT"
 [[ -d Packages/PeekCore/Vendor/libzip.xcframework ]] || ./Scripts/build-libzip.sh
 [[ -d Packages/PeekCore/Vendor/XADMaster.xcframework ]] || ./Scripts/build-xadmaster.sh
 [[ -d Packages/PeekCore/Vendor/CSevenZip.xcframework ]] || ./Scripts/build-7zip.sh
+[[ -d Packages/PeekCore/Vendor/Sparkle.xcframework && -x "$SPARKLE_BIN/generate_appcast" ]] || ./Scripts/build-sparkle.sh
 ./Scripts/generate-project.sh
-if [[ ! -x "$SPARKLE_BIN/generate_appcast" ]]; then
-  xcodebuild -resolvePackageDependencies -project PeekBox.xcodeproj -scheme PeekBox \
-    -derivedDataPath "$ROOT/build/DerivedData" -quiet
-fi
 
 # 发布包瘦身（只在这里做，Debug 版照常构建）：在命令行给出，对工程 target 与 Swift 包 target 同样生效
 # - DEPLOYMENT_POSTPROCESSING：xcodebuild build 默认为 NO，STRIP_INSTALLED_PRODUCT 不起作用，二进制带着全部调试符号；
@@ -48,8 +46,10 @@ xcodebuild -project PeekBox.xcodeproj -scheme PeekBox -configuration Release \
   build -quiet
 
 APP="$DERIVED/Build/Products/Release/PeekBox.app"
-# 增量构建不会更新应用包目录本身的修改时间，打包与 Sparkle 安装又原样保留：系统图标缓存据此认为应用没变，
-# 用户更新后可能仍显示旧版图标。更新包目录的时间（不影响代码签名）
+# 应用包目录的修改时间设为打包时刻（不影响代码签名），每个版本各不相同：
+# - 增量构建不会更新包目录本身的时间，不设置则一直是首次构建时的旧时间，系统图标缓存据此认为应用没变；
+# - 解压、Finder 拷贝与打过补丁的 Sparkle 安装都原样保留它。用户安装时距打包已远超 5 分钟，
+#   LaunchServices 的首次登记即为稳定记录，之后启动主应用不会再重新登记、结束正在运行的预览扩展
 touch "$APP"
 if find "$APP" -name embedded.provisionprofile | grep -q .; then
   echo "错误：产物中包含 embedded.provisionprofile" >&2
@@ -72,6 +72,9 @@ for framework in XADMaster UniversalDetector CSevenZip PeekCore PeekUI; do
   [[ -d "$APP/Contents/Frameworks/$framework.framework" ]] || fail "主应用缺少 $framework.framework"
   [[ ! -d "$BROKER/Contents/Frameworks/$framework.framework" ]] || fail "后台服务仍自带重复的 $framework"
 done
+# 嵌入的 Sparkle 必须是打过补丁的版本（安装更新时不改新应用包的修改时间，见 build-sparkle.sh）
+! strings -a "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate" \
+    | grep -q "Failed to update modification and access time" || fail "嵌入的 Sparkle 未打补丁（安装更新时会改修改时间）"
 # PeekCore / PeekUI 只在主应用 Frameworks 中有一份，扩展与后台服务既不自带、也不再静态链入
 for bundle in "$APP"/Contents/PlugIns/*.appex "$BROKER"; do
   [[ ! -d "$bundle/Contents/Frameworks" ]] || fail "$bundle 自带了 Frameworks：$(ls "$bundle/Contents/Frameworks")"
