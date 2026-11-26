@@ -21,9 +21,11 @@ extension BrowserViewController: NSCollectionViewDataSource, NSCollectionViewDel
         collectionView.dataSource = self
         collectionView.delegate = self
         // 拖入、拖出与列表使用同一目标判断。
-        collectionView.registerForDraggedTypes([.fileURL])
+        collectionView.registerForDraggedTypes([.fileURL] + Self.internalDragTypes)
         collectionView.onDraggingBoundary = { [weak self] in self?.resetDropChecks() }
         collectionView.setDraggingSourceOperationMask(.copy, forLocal: false)
+        // 本视图内拖动（如拖到"应用程序"替身上）同样是拷贝语义，条目不能被移动
+        collectionView.setDraggingSourceOperationMask(.copy, forLocal: true)
         collectionView.contextMenuProvider = { [weak self] _ in self?.makeContextMenu() }
         collectionView.onDoubleClick = { [weak self] indexPath in self?.iconDoubleClicked(at: indexPath) }
         iconScrollView.documentView = collectionView

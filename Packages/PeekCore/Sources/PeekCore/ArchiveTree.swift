@@ -44,6 +44,8 @@ public struct ArchiveTree: Sendable, Codable {
         public let isEncrypted: Bool
         /// 符号链接等特殊条目：显示但不提取
         public let isSpecial: Bool
+        /// 符号链接的目标（引擎能读出时才有）
+        public var linkTarget: String? = nil
     }
 
     public private(set) var items: [String: Item] = [:]
@@ -56,7 +58,7 @@ public struct ArchiveTree: Sendable, Codable {
 
     /// 按原始路径加入一个条目，自动补出缺失的上级目录。
     public mutating func add(rawPath: String, isDirectory: Bool, entryIndex: Int?, size: Int64?,
-                             modified: Date?, isEncrypted: Bool, isSpecial: Bool = false) {
+                             modified: Date?, isEncrypted: Bool, isSpecial: Bool = false, linkTarget: String? = nil) {
         let components = rawPath.split(separator: "/", omittingEmptySubsequences: true)
             .map(String.init)
             .filter { $0 != "." && $0 != ".." }
@@ -68,7 +70,7 @@ public struct ArchiveTree: Sendable, Codable {
         }
         register(Item(path: components.joined(separator: "/"), name: name, isDirectory: isDirectory,
                       entryIndex: entryIndex, size: isDirectory ? nil : size, modified: modified,
-                      isEncrypted: isEncrypted, isSpecial: isSpecial))
+                      isEncrypted: isEncrypted, isSpecial: isSpecial, linkTarget: linkTarget))
     }
 
     private mutating func register(_ item: Item) {
@@ -138,13 +140,27 @@ extension ArchiveReader {
 
     /// 提取文件或目录（目录连同全部后代）。
     public func extract(path: String, to destination: URL, password: String?) throws {
+        try extract(path: path, to: destination, password: password, batchBytes: .max) { _ in }
+    }
+
+    /// 同上，按批提取：每批约 batchBytes 字节，完成后以该批字节数回调（可抛错以取消）。
+    /// 引擎读出了目标的符号链接按原样重建（App 包内的 framework 依赖它们），且在全部文件写完之后才创建，
+    /// 文件不会经由符号链接写到 destination 之外；读不出目标的符号链接跳过
+    public func extract(path: String, to destination: URL, password: String?, batchBytes: Int64,
+                        progress: (Int64) throws -> Void) throws {
         guard let item = tree.items[path] else { throw ArchiveError.entryNotFound(path) }
         let fm = FileManager.default
-        if fm.fileExists(atPath: destination.path) {
+        if fm.fileExists(atPath: destination.path) || (try? fm.destinationOfSymbolicLink(atPath: destination.path)) != nil {
             throw ArchiveError.destinationExists(destination.lastPathComponent)
         }
         guard item.isDirectory else {
+            if item.isSpecial {
+                guard let target = item.linkTarget else { return }
+                try fm.createSymbolicLink(atPath: destination.path, withDestinationPath: target)
+                return
+            }
             try extractFile(item, to: destination, password: password)
+            try progress(item.size ?? 0)
             return
         }
         try fm.createDirectory(at: destination, withIntermediateDirectories: false)
@@ -153,13 +169,40 @@ extension ArchiveReader {
             try fm.createDirectory(at: destination.appendingPathComponent(String(directory.path.dropFirst(prefix.count))),
                                    withIntermediateDirectories: true)
         }
-        var jobs: [(item: ArchiveTree.Item, target: URL)] = []
-        for file in tree.descendantFiles(of: path) where !file.isSpecial {
+        var links: [(target: String, at: URL)] = []
+        var batch: [(item: ArchiveTree.Item, target: URL)] = []
+        var batchSize: Int64 = 0
+        func flush() throws {
+            guard !batch.isEmpty else { return }
+            try extractFiles(batch, password: password)
+            try progress(batchSize)
+            batch.removeAll()
+            batchSize = 0
+        }
+        // 按路径排序：同一目录的文件相邻，7-Zip 等引擎按条目顺序解码更快
+        for file in tree.descendantFiles(of: path).sorted(by: { $0.path < $1.path }) {
             // 相对路径来自已规范化的组件（无 . / ..），不会逃出 destination
             let target = destination.appendingPathComponent(String(file.path.dropFirst(prefix.count)))
+            if file.isSpecial {
+                if let link = file.linkTarget { links.append((link, target)) }
+                continue
+            }
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-            jobs.append((file, target))
+            batch.append((file, target))
+            batchSize += file.size ?? 0
+            if batchSize >= batchBytes { try flush() }
         }
-        try extractFiles(jobs, password: password)
+        try flush()
+        let root = destination.resolvingSymlinksInPath().path + "/"
+        for link in links {
+            // 同一路径已被目录占用（归档中既有符号链接 a、又有 a/ 下的文件）时跳过，不覆盖已写入的内容
+            if fm.fileExists(atPath: link.at.path) { continue }
+            // 上级目录在前面已全部建好（目录树会补出隐含的上级目录）。上级经由先建好的符号链接指向
+            // destination 之外时跳过（如链接 a → /etc 之后的 a/b），不在那里创建任何东西
+            let parent = link.at.deletingLastPathComponent()
+            guard fm.fileExists(atPath: parent.path),
+                  (parent.resolvingSymlinksInPath().path + "/").hasPrefix(root) else { continue }
+            try fm.createSymbolicLink(atPath: link.at.path, withDestinationPath: link.target)
+        }
     }
 }

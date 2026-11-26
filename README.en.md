@@ -14,9 +14,13 @@ PeekBox is a Quick Look tool for Apple silicon Macs. Select a folder or an archi
 | --- | --- |
 | Browse folders | Expand subfolders and the archives inside them, switch between list, icon and column views, and see size, kind and dates. |
 | Browse archives | View ZIP, 7z, RAR, TAR, tar.gz, tar.bz2 and tar.xz, plus gzip, bzip2 and xz files that macOS recognizes. |
+| Browse disk images | View the files in DMG, ISO, CDR and Toast images without mounting them. HFS+, APFS, FAT, UDF, ISO 9660 and other file systems are supported, as are DMGs in every compression format; apps inside an image show their own icon and total size, as in Finder. |
+| Install an app from a DMG | In the preview, drag the app onto the image's Applications alias to copy it into the Applications folder. If an item with the same name exists, choose Replace (the old version goes to the Trash), Skip or Keep Both. |
 | Extract only what you need | Select one or more entries in the preview and drag them to a Finder folder or the desktop. Enter the password when asked for encrypted content. |
 | Edit ZIP archives | Drag files or folders from Finder into the root or a subfolder of a ZIP, create folders, or rename and delete entries. Follow the prompt when a name already exists. |
 | Open and inspect files | Open, copy, copy the path, show info or reveal in Finder from the toolbar or the context menu. Available actions depend on the item and on permissions. The inspector shows the contents of supported file types. |
+
+Files dragged out of, opened from or copied out of an archive or disk image keep the original file's download quarantine attribute, as with Archive Utility and mounted images, so a downloaded app is still checked by macOS the first time it opens. Encrypted DMGs cannot be previewed yet; partitions that cannot be browsed yet, such as exFAT, are listed as disk image files that you can drag out and mount in Finder.
 
 ZIP editing works on regular, single-volume, writable ZIP archives on an internal disk. Network volumes, external volumes, iCloud files and archives with signatures are read-only. Encrypted ZIP archives do not accept new files or folders, but their entries can be renamed and deleted. 7z, RAR, TAR and the other formats can be browsed and extracted.
 
@@ -58,7 +62,7 @@ Removing the quarantine attribute does not notarize the app, and it does not fix
 
 ## Usage
 
-1. **Preview.** Select a folder or an archive in Finder and press Space. Click the disclosure triangle to expand a subfolder, or double-click a folder to go into it.
+1. **Preview.** Select a folder, an archive or a disk image in Finder and press Space. Click the disclosure triangle to expand a subfolder, or double-click a folder to go into it.
 2. **Extract.** Drag the selected entries out of an archive preview to the desktop or a Finder folder. If the app asks for a password, unlock first and then drag again.
 3. **Edit a ZIP.** Drag files from Finder onto an empty area of the ZIP preview or onto a target folder. Right-click to see whether you can create a folder, rename or delete at the selected location. A progress window appears while writing, and you can keep browsing the preview; closing the preview does not stop the write, and the contents refresh when you open it again. By default, the version before a rename, delete or replace is moved to the Trash as "xxx (before edit).zip", where you can use Put Back.
 4. **Customize.** Use the preview toolbar to switch views or open the inspector. In the app you can manage columns, icon size, hidden files, the archive size limit and the temporary cache.
@@ -80,6 +84,7 @@ cd Peekbox
 # Download pinned third-party sources and build arm64 XCFrameworks.
 ./Scripts/build-libzip.sh
 ./Scripts/build-xadmaster.sh
+./Scripts/build-7zip.sh
 
 # Generate the Xcode project from project.yml and fix the file type of AppIcon.icon.
 ./Scripts/generate-project.sh

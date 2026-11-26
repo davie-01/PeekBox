@@ -44,6 +44,16 @@ final class PreviewCollectionView: NSCollectionView {
     }
 }
 
+/// 图标项的根视图：不接受隐藏。NSCollectionView 在拖动开始时会把被拖的条目设为隐藏，直到拖动会话结束
+/// （包括放下失败后拖动图像飞回原位的约 0.5 秒）才恢复，看起来像图标闪了一下。Finder 拖动时原位图标始终可见；
+/// 诊断日志显示，条目的显示与回收是通过加入 / 移出视图层级完成的，隐藏只出现在拖动期间
+final class IconItemView: NSView {
+    override var isHidden: Bool {
+        get { super.isHidden }
+        set { super.isHidden = false }
+    }
+}
+
 /// 图标项：图标 + 最多两行名称；选中时图标加圆角底色、名称加强调色背景（参考 Finder）
 final class IconItem: NSCollectionViewItem {
     static let identifier = NSUserInterfaceItemIdentifier("IconItem")
@@ -56,10 +66,13 @@ final class IconItem: NSCollectionViewItem {
     var representedID: String?
 
     override func loadView() {
-        let root = NSView()
+        let root = IconItemView()
         iconBackground.wantsLayer = true
         iconBackground.layer?.cornerRadius = 6
         iconView.imageScaling = .scaleProportionallyUpOrDown
+        // NSImageView 默认登记了文件与 File Promise 等拖放类型，且不可编辑时一律拒绝：不取消登记，
+        // 拖到图标正中时拖放交给它而到不了集合视图（只有图标边缘能放下）
+        iconView.unregisterDraggedTypes()
         // 换行标签默认可选中文字，指针在名称上会变成 I 形
         nameField.isSelectable = false
         nameField.alignment = .center

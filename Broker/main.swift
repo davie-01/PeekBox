@@ -250,6 +250,9 @@ extension Broker {
                     results.append(target.path)
                     self.materializeCache.recordFile(archive: identity, entryPath: entryPath, url: target)
                 }
+                // 继承压缩包的隔离属性（打开下载来的 App 仍经过 Gatekeeper）；复用的副本也补上，
+                // 旧版本留下的缓存没有这个属性
+                Quarantine.inherit(from: archive, to: results.map { URL(fileURLWithPath: $0) })
                 self.log.notice("materialized \(results.count) entries (\(reused) reused)")
                 reply(results, nil)
             } catch {
@@ -387,6 +390,7 @@ extension Broker {
                     return (item: item, target: url)
                 }
                 try reader.extractFiles(jobs, password: password)
+                Quarantine.inherit(from: archive, to: jobs.map(\.target))
                 self.log.notice("extracted \(jobs.count) entries for client")
                 reply(nil)
             } catch {
@@ -468,6 +472,36 @@ extension Broker {
                     reply(0, 0, 0, true, nil)
                 } catch {
                     self.log.error("add to archive failed: \(error.localizedDescription, privacy: .public)")
+                    reply(0, 0, 0, false, error.localizedDescription)
+                }
+                Task { @MainActor in panel.finish() }
+                self.endWork()
+            }
+        }
+    }
+
+    func copyFromArchive(archivePath: String, entryPaths: [String], destination: String, password: String?,
+                         reply: @escaping @Sendable (Int, Int, Int, Bool, String?) -> Void) {
+        let archive = URL(fileURLWithPath: archivePath)
+        let target = URL(fileURLWithPath: destination, isDirectory: true)
+        beginWork()
+        Task { @MainActor in
+            let panel = ArchiveWritePanel(archive: archive, copyDestination: target)
+            let control = panel.control
+            // 按目标文件夹串行：同时往"应用程序"拷两次时冲突判断不会互相干扰
+            self.writeQueue(for: target).async {
+                do {
+                    let reader = try self.materializeCache.reader(for: archive, identity: MaterializeCache.ArchiveIdentity(archive),
+                                                                  password: password)
+                    let summary = try ArchiveCopier.copy(reader: reader, archive: archive, paths: entryPaths, to: target,
+                                                         password: password, control: control, resolve: { panel.resolve($0) })
+                    self.log.notice("copied from archive: \(summary.added) added, \(summary.replaced) replaced, \(summary.skipped) skipped")
+                    reply(summary.added, summary.replaced, summary.skipped, false, nil)
+                } catch ZipEditor.EditError.cancelled {
+                    self.log.notice("copy from archive cancelled")
+                    reply(0, 0, 0, true, nil)
+                } catch {
+                    self.log.error("copy from archive failed: \(error.localizedDescription, privacy: .public)")
                     reply(0, 0, 0, false, error.localizedDescription)
                 }
                 Task { @MainActor in panel.finish() }

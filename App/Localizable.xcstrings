@@ -193,6 +193,22 @@
         }
       }
     },
+    "“%@”中已有同名项目。替换会把原有的“%@”移到废纸篓。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An item with the same name already exists in “%1$@”. Replacing it moves the existing “%2$@” to the Trash."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”中已有同名项目。替换会把原有的“%@”移到废纸篓。"
+          }
+        }
+      }
+    },
     "“%@”已存在": {
       "localizations": {
         "en": {
@@ -269,6 +285,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "主页"
+          }
+        }
+      }
+    },
+    "从“%@”中提取。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extracting from “%@”."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从“%@”中提取。"
           }
         }
       }
@@ -1598,6 +1630,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在取消…"
+          }
+        }
+      }
+    },
+    "正在拷贝到“%@”": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copying to “%@”"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在拷贝到“%@”"
           }
         }
       }

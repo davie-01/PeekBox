@@ -15,6 +15,8 @@ final class ArchiveWritePanel: NSObject, NSWindowDelegate {
     private let progressPanel = DialogPanel.make(canBecomeKey: false)
     private let conflictPanel = DialogPanel.make()
     private let archive: URL
+    /// 拷到真实文件夹（见 ArchiveCopier）时为目标文件夹；写入压缩包时为 nil
+    private let copyDestination: URL?
     private var completed = false
     private var answer: ((ZipEditor.ConflictDecision) -> Void)?
     /// 等待冲突选择期间进度循环挂起在这里，不再定时唤醒
@@ -30,8 +32,9 @@ final class ArchiveWritePanel: NSObject, NSWindowDelegate {
     // 冲突
     private let applyAll = PanelButton(checkboxWithTitle: "", target: nil, action: nil)
 
-    init(archive: URL) {
+    init(archive: URL, copyDestination: URL? = nil) {
         self.archive = archive
+        self.copyDestination = copyDestination
         super.init()
         progressPanel.delegate = self
         conflictPanel.delegate = self
@@ -49,11 +52,20 @@ final class ArchiveWritePanel: NSObject, NSWindowDelegate {
         progressRow.spacing = 10
         cancelButton = DialogButton(title: String(localized: "取消", bundle: .app), drawsBackground: true,
                                     target: self, action: #selector(cancelClicked))
-        progressContent = DialogContentView(
-            icon: NSWorkspace.shared.icon(forFile: archive.path),
-            title: String(localized: "正在写入“\(archive.lastPathComponent)”", bundle: .app),
-            message: String(localized: "完成前请不要移动或修改这个压缩包。", bundle: .app),
-            accessories: [progressRow], trailingButtons: [cancelButton])
+        if let copyDestination {
+            let folder = FileManager.default.displayName(atPath: copyDestination.path)
+            progressContent = DialogContentView(
+                icon: NSWorkspace.shared.icon(forFile: copyDestination.path),
+                title: String(localized: "正在拷贝到“\(folder)”", bundle: .app),
+                message: String(localized: "从“\(archive.lastPathComponent)”中提取。", bundle: .app),
+                accessories: [progressRow], trailingButtons: [cancelButton])
+        } else {
+            progressContent = DialogContentView(
+                icon: NSWorkspace.shared.icon(forFile: archive.path),
+                title: String(localized: "正在写入“\(archive.lastPathComponent)”", bundle: .app),
+                message: String(localized: "完成前请不要移动或修改这个压缩包。", bundle: .app),
+                accessories: [progressRow], trailingButtons: [cancelButton])
+        }
         progressPanel.contentView = progressContent
         applyAll.focusRingType = .none
 
@@ -115,10 +127,19 @@ final class ArchiveWritePanel: NSObject, NSWindowDelegate {
         showingConflict = true
         let name = (conflict.path as NSString).lastPathComponent
         let directory = conflict.incomingIsDirectory || conflict.existingIsDirectory
-        let message = directory
-            ? String(localized: "压缩包中已有同名项目。替换会移除原有的“\(name)”及其全部内容。", bundle: .app)
-            : String(localized: "压缩包中已有同名项目。要用拖入的项目替换它吗？", bundle: .app)
-        let type = conflict.incomingIsDirectory ? UTType.folder : UTType(filenameExtension: (name as NSString).pathExtension) ?? .data
+        let message: String
+        if let copyDestination {
+            let folder = FileManager.default.displayName(atPath: copyDestination.path)
+            message = String(localized: "“\(folder)”中已有同名项目。替换会把原有的“\(name)”移到废纸篓。", bundle: .app)
+        } else {
+            message = directory
+                ? String(localized: "压缩包中已有同名项目。替换会移除原有的“\(name)”及其全部内容。", bundle: .app)
+                : String(localized: "压缩包中已有同名项目。要用拖入的项目替换它吗？", bundle: .app)
+        }
+        let ext = (name as NSString).pathExtension
+        let type = conflict.incomingIsDirectory
+            ? (ArchiveSource.isPackageName(name) ? UTType(filenameExtension: ext, conformingTo: .directory) : nil) ?? .folder
+            : UTType(filenameExtension: ext) ?? .data
 
         // 只有后面还有同名项目时，"同样处理"才有意义
         var accessories: [NSView] = []

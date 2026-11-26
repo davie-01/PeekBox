@@ -15,6 +15,8 @@ public struct FolderSource: EntrySource {
     /// 可展开的压缩包扩展名（.tar.gz 按最后的 gz 识别）；JAR/APK 等 ZIP 容器不在此列（V1 不接管）
     private static let archiveExtensions: Set<String> = [
         "zip", "7z", "rar", "tar", "tgz", "gz", "tbz", "tbz2", "bz2", "txz", "xz",
+        // 磁盘镜像
+        "dmg", "img", "iso", "cdr", "toast",
     ]
 
     /// 列举时只取廉价属性。种类（localizedTypeDescription）要逐个询问 LaunchServices、标签要读扩展属性，

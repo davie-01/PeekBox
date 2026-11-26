@@ -26,6 +26,7 @@ cd "$ROOT"
 [[ "${SKIP_APPCAST:-0}" == 1 || -s "$NOTES" ]] || { echo "错误：缺少更新说明 $NOTES" >&2; exit 1; }
 [[ -d Packages/PeekCore/Vendor/libzip.xcframework ]] || ./Scripts/build-libzip.sh
 [[ -d Packages/PeekCore/Vendor/XADMaster.xcframework ]] || ./Scripts/build-xadmaster.sh
+[[ -d Packages/PeekCore/Vendor/CSevenZip.xcframework ]] || ./Scripts/build-7zip.sh
 ./Scripts/generate-project.sh
 if [[ ! -x "$SPARKLE_BIN/generate_appcast" ]]; then
   xcodebuild -resolvePackageDependencies -project PeekBox.xcodeproj -scheme PeekBox \
@@ -54,8 +55,15 @@ ASSETS=$(xcrun assetutil --info "$APP/Contents/Resources/Assets.car" 2>/dev/null
 [[ "$ASSETS" == *'"Name" : "AppIcon"'* ]] || fail "Assets.car 中没有 AppIcon（图标未编译，见 Scripts/generate-project.sh）"
 BROKER="$APP/Contents/Helpers/PeekBoxBroker.app"
 [[ -x "$BROKER/Contents/MacOS/PeekBoxBroker" ]] || fail "缺少后台服务 $BROKER"
-[[ ! -d "$BROKER/Contents/Frameworks/XADMaster.framework" ]] || fail "后台服务仍自带重复的 XADMaster"
-for license in LICENSE THIRD-PARTY-LICENSES.md libzip.txt XADMaster.txt UniversalDetector.txt Sparkle.txt; do
+for framework in XADMaster UniversalDetector CSevenZip; do
+  [[ -d "$APP/Contents/Frameworks/$framework.framework" ]] || fail "主应用缺少 $framework.framework"
+  [[ ! -d "$BROKER/Contents/Frameworks/$framework.framework" ]] || fail "后台服务仍自带重复的 $framework"
+done
+# 7-Zip 的读取代码只应存在于共享框架中，不得再静态链进扩展或后台服务
+for binary in "$APP"/Contents/PlugIns/*.appex/Contents/MacOS/* "$BROKER/Contents/MacOS/PeekBoxBroker"; do
+  ! xcrun nm -U "$binary" 2>/dev/null | grep -q '_psz_open' || fail "$binary 中静态链入了 7-Zip"
+done
+for license in LICENSE THIRD-PARTY-LICENSES.md libzip.txt XADMaster.txt UniversalDetector.txt Sparkle.txt 7-Zip.txt; do
   [[ -s "$APP/Contents/Resources/Licenses/$license" ]] || fail "应用包中缺少许可文件 $license"
 done
 for ext in FolderPreview ArchivePreview; do

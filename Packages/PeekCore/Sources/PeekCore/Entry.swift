@@ -21,15 +21,23 @@ public struct Entry: Sendable, Hashable, Identifiable {
     public let archiveURL: URL?
     /// 归档内加密条目，提取前需要密码
     public let isEncrypted: Bool
+    /// 归档内的包（.app 等）：在归档中是目录，按 Finder 的习惯作为一个整体显示，不展开
+    public let isPackage: Bool
+    /// 归档内的符号链接及其目标（引擎能读出时才有）
+    public let isSymlink: Bool
+    public let linkTarget: String?
     /// 以下仅文件夹条目有值（列举时一并读取）
     public let created: Date?
     public let added: Date?
 
-    public var isExpandable: Bool { isDirectory || isArchive }
+    public var isExpandable: Bool { (isDirectory && !isPackage) || isArchive }
+    /// 按文件夹排序与显示：包在 Finder 中按文件处理
+    public var isFolderLike: Bool { isDirectory && !isPackage }
 
     /// 归档内条目
     public init(id: String, name: String, isDirectory: Bool, size: Int64?, modified: Date?, kind: String?,
-                archiveURL: URL, isEncrypted: Bool = false) {
+                archiveURL: URL, isEncrypted: Bool = false, isPackage: Bool = false,
+                isSymlink: Bool = false, linkTarget: String? = nil) {
         archiveID = id
         directoryURL = nil
         self.name = name
@@ -40,6 +48,9 @@ public struct Entry: Sendable, Hashable, Identifiable {
         isArchive = false
         self.archiveURL = archiveURL
         self.isEncrypted = isEncrypted
+        self.isPackage = isPackage
+        self.isSymlink = isSymlink
+        self.linkTarget = linkTarget
         created = nil
         added = nil
     }
@@ -57,6 +68,9 @@ public struct Entry: Sendable, Hashable, Identifiable {
         self.isArchive = isArchive
         archiveURL = nil
         isEncrypted = false
+        isPackage = false
+        isSymlink = false
+        linkTarget = nil
         self.created = created
         self.added = added
     }
@@ -78,7 +92,7 @@ extension Array where Element == Entry {
     /// Finder 风格自然排序，可选文件夹置顶。
     public func sortedForDisplay(foldersFirst: Bool) -> [Entry] {
         sorted { a, b in
-            if foldersFirst, a.isDirectory != b.isDirectory { return a.isDirectory }
+            if foldersFirst, a.isFolderLike != b.isFolderLike { return a.isFolderLike }
             return a.name.localizedStandardCompare(b.name) == .orderedAscending
         }
     }

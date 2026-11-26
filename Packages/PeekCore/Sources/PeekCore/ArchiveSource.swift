@@ -1,7 +1,7 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// 压缩包数据源：ZIP 优先用 libzip，其余格式与 libzip 打不开的 ZIP（如分卷）交给 XADMaster。
+/// 压缩包数据源：ZIP 优先用 libzip，磁盘镜像交给 7-Zip，其余格式与 libzip 打不开的 ZIP（如分卷）交给 XADMaster。
 /// 首次访问时打开并缓存；密码只保存在本对象内存中，预览关闭即随之释放。
 public final class ArchiveSource: EntrySource {
     public let rootURL: URL
@@ -116,21 +116,65 @@ public final class ArchiveSource: EntrySource {
         return (tree.children[parentPath] ?? []).compactMap { path in
             guard let item = tree.items[path] else { return nil }
             if !showHidden, item.name.hasPrefix(".") || item.name == "__MACOSX" { return nil }
+            let isPackage = item.isDirectory && Self.isPackageName(item.name)
             return Entry(
                 id: Self.entryID(for: path),
                 name: item.name,
                 isDirectory: item.isDirectory,
-                size: item.size,
+                // 包按 Finder 的习惯显示总大小
+                size: isPackage ? tree.descendantFiles(of: path).compactMap(\.size).saturatingSum : item.size,
                 modified: item.modified,
                 kind: Self.kind(of: item),
                 archiveURL: rootURL,
-                isEncrypted: item.isEncrypted
+                isEncrypted: item.isEncrypted,
+                isPackage: isPackage,
+                isSymlink: item.isSpecial,
+                linkTarget: item.linkTarget
             )
         }
     }
 
     public func archiveSource(for archive: URL) -> ArchiveSource? {
         archive == rootURL ? self : nil
+    }
+
+    /// 归档内应用包（.app 等）的图标数据：按 Contents/Info.plist 的 CFBundleIconFile 提取 Resources 中的 .icns。
+    /// 只用 Asset Catalog（Assets.car）存放图标、没有 .icns 的包返回 nil
+    public func bundleIconData(for entry: Entry) async -> Data? {
+        guard entry.isPackage, let reader = try? await reader() else { return nil }
+        let path = Self.archivePath(of: entry)
+        let password = self.password
+        return await Task.detached(priority: .utility) {
+            Self.bundleIconData(in: reader, package: path, password: password)
+        }.value
+    }
+
+    static func bundleIconData(in reader: any ArchiveReader, package path: String, password: String?) -> Data? {
+        let tree = reader.tree
+        let fm = FileManager.default
+        let work = fm.temporaryDirectory.appendingPathComponent("PeekBox-icon-\(UUID().uuidString)")
+        guard (try? fm.createDirectory(at: work, withIntermediateDirectories: true)) != nil else { return nil }
+        defer { try? fm.removeItem(at: work) }
+        func read(_ relative: String, limit: Int64) -> Data? {
+            guard let item = tree.items[path + "/" + relative], !item.isDirectory, !item.isSpecial,
+                  (item.size ?? 0) <= limit else { return nil }
+            let target = work.appendingPathComponent(UUID().uuidString)
+            guard (try? reader.extractFile(item, to: target, password: password)) != nil else { return nil }
+            return try? Data(contentsOf: target)
+        }
+        var names: [String] = []
+        if let data = read("Contents/Info.plist", limit: 1 << 20),
+           let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
+            for key in ["CFBundleIconFile", "CFBundleIconName"] {
+                if let name = plist[key] as? String, !name.isEmpty { names.append(name) }
+            }
+        }
+        names.append("AppIcon")
+        for name in names {
+            let file = (name as NSString).pathExtension.isEmpty ? name + ".icns" : name
+            if let data = read("Contents/Resources/" + file, limit: 32 << 20) { return data }
+        }
+        return nil
     }
 
     public static func entryID(for path: String) -> String { "archive:" + path }
@@ -164,6 +208,16 @@ public final class ArchiveSource: EntrySource {
         // 分卷 ZIP 的末卷从数据中间切开，开头不是 PK，按扩展名也要交给 libzip 才能拿到多卷错误码
         if hasZipSignature(url) || url.pathExtension.lowercased() == "zip" {
             do { return try ZipArchive.open(url) } catch { zipError = error }
+        }
+        // 磁盘镜像交给 7-Zip。7-Zip 打不开的 ISO 再交给 XADMaster 试一次（它只认 ISO 9660）
+        if zipError == nil, DiskImage.matches(url) {
+            do {
+                return try SevenZipArchive.open(url)
+            } catch {
+                guard url.pathExtension.lowercased() == "iso" else { throw error }
+                if let archive = try? XADArchive.open(url, password: password) { return archive }
+                throw error
+            }
         }
         // 分卷包：在文件夹预览中扩展可读到其他卷，XADMaster 能正常打开；单独预览时读不到，
         // XADMaster 会报错或返回空列表
@@ -212,8 +266,23 @@ public final class ArchiveSource: EntrySource {
         return magic.starts(with: [0x50, 0x4B]) // PK
     }
 
+    /// .app、.bundle 等在 Finder 中作为整体显示的目录（按扩展名判断，不需要读取内容）
+    public static func isPackageName(_ name: String) -> Bool {
+        let ext = (name as NSString).pathExtension
+        guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .directory) else { return false }
+        return type.conforms(to: .package)
+    }
+
     private static func kind(of item: ArchiveTree.Item) -> String? {
-        if item.isDirectory { return UTType.folder.localizedDescription }
+        if item.isDirectory {
+            if isPackageName(item.name), let type = UTType(filenameExtension: (item.name as NSString).pathExtension,
+                                                          conformingTo: .directory) {
+                return type.localizedDescription
+            }
+            return UTType.folder.localizedDescription
+        }
+        // Finder 把符号链接的种类显示为"替身"
+        if item.isSpecial { return UTType.aliasFile.localizedDescription }
         return UTType(filenameExtension: (item.name as NSString).pathExtension)?.localizedDescription
     }
 }

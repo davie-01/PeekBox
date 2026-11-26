@@ -817,6 +817,22 @@
         }
       }
     },
+    "已取消拷贝": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy cancelled"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消拷贝"
+          }
+        }
+      }
+    },
     "已取消，压缩包未改动": {
       "localizations": {
         "en": {
@@ -945,6 +961,22 @@
         }
       }
     },
+    "已拷贝到“%@”": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied to “%@”"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已拷贝到“%@”"
+          }
+        }
+      }
+    },
     "已拷贝路径": {
       "localizations": {
         "en": {
@@ -1065,6 +1097,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "已跳过，压缩包未改动"
+          }
+        }
+      }
+    },
+    "已跳过，未拷贝任何项目": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skipped; nothing was copied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已跳过，未拷贝任何项目"
           }
         }
       }
@@ -1307,6 +1355,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "拷贝"
+          }
+        }
+      }
+    },
+    "拷贝失败：%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy failed: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝失败：%@"
           }
         }
       }
@@ -1615,6 +1679,22 @@
         }
       }
     },
+    "松开后拷贝到“%@”": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Release to copy to “%@”"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "松开后拷贝到“%@”"
+          }
+        }
+      }
+    },
     "检查更新…": {
       "localizations": {
         "en": {
@@ -1659,6 +1739,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在向 ZIP 复制文件…"
+          }
+        }
+      }
+    },
+    "正在拷贝到“%@”…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copying to “%@”…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在拷贝到“%@”…"
           }
         }
       }

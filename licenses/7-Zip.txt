@@ -1,22 +1,48 @@
-  7-Zip for Linux and macOS
-  ~~~~~~~~~~~~~~~~~~~~~~~~~
+7-Zip in PeekBox
+================
+
+PeekBox ships CSevenZip.framework, built by Scripts/build-7zip.sh from the 7-Zip 26.06 source code
+(https://github.com/ip7z/7zip, commit d3296e39e1f1f92c7b41c0c3848e65640428d42d). It is used to read disk images
+and file systems (DMG, ISO, UDF, HFS+, APFS, FAT, NTFS, ext, virtual disks and partition maps).
+
+- Only the read-side format handlers and decoders listed in Scripts/build-7zip.sh are compiled.
+  The CPP/7zip/Compress/Rar* files (GNU LGPL with the "unRAR license restriction") are NOT included;
+  RAR archives are read by XADMaster instead.
+- The compiled code is under the GNU LGPL 2.1 or later, except CPP/7zip/Compress/LzfseDecoder.cpp and
+  C/ZstdDec.c (BSD 3-clause License) and C/Xxh64.c (BSD 2-clause License). Their notices are reproduced below.
+- PeekBox modifies the UDF reader (CPP/7zip/Archive/Udf/UdfIn.h, UdfIn.cpp, UdfHandler.cpp) so that images
+  containing symbolic links can be opened. The change is published as
+  Packages/PeekCore/SevenZipBridge/patches/udf-symlink.patch, and each modified file carries a notice.
+- The framework also contains PeekBox's own bridge code (Packages/PeekCore/SevenZipBridge), licensed under
+  the GNU GPL version 3 like the rest of PeekBox.
+- The framework is a separate dynamic library in PeekBox.app/Contents/Frameworks and can be replaced with
+  a build made from modified 7-Zip sources using Scripts/build-7zip.sh.
+
+The original license file of the 7-Zip source code (DOC/License.txt) follows.
+
+------------------------------------------------------------------------------------------------------------
+
+  7-Zip source code
+  ~~~~~~~~~~~~~~~~~
   License for use and distribution
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   7-Zip Copyright (C) 1999-2026 Igor Pavlov.
 
-  The licenses for 7zz and 7zzs files are:
+  The licenses for files are:
 
-         - The "GNU LGPL" as main license for most of the code
-         - The "GNU LGPL" with "unRAR license restriction" for some code
-         - The "BSD 3-clause License" for some code
-         - The "BSD 2-clause License" for some code
+    - CPP/7zip/Compress/Rar* files: the "GNU LGPL" with "unRAR license restriction"
+    - CPP/7zip/Compress/LzfseDecoder.cpp: the "BSD 3-clause License"
+    - C/ZstdDec.c: the "BSD 3-clause License"
+    - C/Xxh64.c: the "BSD 2-clause License"
+    - Some files are "public domain" files, if "public domain" status is stated in source file.
+    - the "GNU LGPL" for all other files. If there is no license information in 
+       some source file, that file is under the "GNU LGPL".
 
-  Redistributions in binary form must reproduce related license information from this file.
+  The "GNU LGPL" with "unRAR license restriction" means that you must follow both 
+  "GNU LGPL" rules and "unRAR license restriction" rules.
 
-  Note:
-    You can use 7-Zip on any computer, including a computer in a commercial
-    organization. You don't need to register or pay for 7-Zip.
+
 
 
 GNU LGPL information
@@ -32,7 +58,9 @@ GNU LGPL information
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     Lesser General Public License for more details.
 
-    You can receive a copy of the GNU Lesser General Public License from
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, 
+    you can get a copy of the GNU Lesser General Public License from
     http://www.gnu.org/
 
 
@@ -43,9 +71,11 @@ BSD 3-clause License in 7-Zip code
 
   The "BSD 3-clause License" is used for the following code in 7z.dll
     1) LZFSE data decompression.
+         CPP/7zip/Compress/LzfseDecoder.cpp.
        That code was derived from the code in the "LZFSE compression library" developed by Apple Inc,
        that also uses the "BSD 3-clause License".
     2) ZSTD data decompression.
+         C/ZstdDec.c
        that code was developed using original zstd decoder code as reference code.
        The original zstd decoder code was developed by Facebook Inc,
        that also uses the "BSD 3-clause License".
@@ -91,6 +121,7 @@ BSD 2-clause License in 7-Zip code
 ----------------------------------
 
   The "BSD 2-clause License" is used for the XXH64 code in 7-Zip.
+    C/Xxh64.c
 
   XXH64 code in 7-Zip was derived from the original XXH64 code developed by Yann Collet.
 

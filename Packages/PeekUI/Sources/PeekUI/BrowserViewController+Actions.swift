@@ -203,8 +203,8 @@ extension BrowserViewController: NSMenuItemValidation {
 
     @objc func openItems(_ sender: Any?) {
         let entries = targets(for: sender).map(\.entry)
-        // 压缩包内的单个目录：进入；文件夹中的目录：交给 Finder 打开
-        if entries.count == 1, entries[0].isDirectory, entries[0].fileURL == nil {
+        // 压缩包内的单个目录：进入；文件夹中的目录与压缩包内的包（.app 等）：提取后交给系统打开
+        if entries.count == 1, entries[0].isExpandable, entries[0].fileURL == nil {
             enter(entries[0])
             return
         }
@@ -241,7 +241,7 @@ extension BrowserViewController: NSMenuItemValidation {
     func open(_ entries: [Entry], with app: URL?) {
         let limited = Array(entries.prefix(10))
         if entries.count > limited.count { flash(String(localized: "一次最多打开 10 项", bundle: .peekUI)) }
-        resolveURLs(for: limited.filter { $0.fileURL != nil || !$0.isDirectory }) { [weak self] urls in
+        resolveURLs(for: limited.filter { $0.fileURL != nil || !$0.isDirectory || $0.isPackage }) { [weak self] urls in
             for url in urls {
                 Task {
                     do {

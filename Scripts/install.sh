@@ -13,6 +13,7 @@ cd "$ROOT"
 # 第三方库不提交仓库，缺失时先构建
 [[ -d Packages/PeekCore/Vendor/libzip.xcframework ]] || ./Scripts/build-libzip.sh
 [[ -d Packages/PeekCore/Vendor/XADMaster.xcframework ]] || ./Scripts/build-xadmaster.sh
+[[ -d Packages/PeekCore/Vendor/CSevenZip.xcframework ]] || ./Scripts/build-7zip.sh
 ./Scripts/generate-project.sh
 
 xcodebuild -project PeekBox.xcodeproj -scheme PeekBox -configuration Debug \

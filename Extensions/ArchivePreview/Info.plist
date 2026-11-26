@@ -43,6 +43,10 @@
 				<string>org.tukaani.xz-archive</string>
 				<string>org.7-zip.7-zip-archive</string>
 				<string>com.rarlab.rar-archive</string>
+				<string>com.apple.disk-image-udif</string>
+				<string>com.apple.disk-image-cdr</string>
+				<string>com.roxio.disk-image-toast</string>
+				<string>public.iso-image</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

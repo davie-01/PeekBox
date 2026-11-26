@@ -54,6 +54,11 @@ public final class BrowserViewController: NSViewController {
     let iconScrollView = NSScrollView()
     let collectionView = PreviewCollectionView()
     let thumbnailCache = NSCache<NSString, NSImage>()
+    /// 归档内应用包的图标（按条目 ID）与正在读取的条目；见 BrowserViewController+EntryIcons.swift
+    var bundleIcons: [String: NSImage] = [:]
+    var bundleIconLoads: Set<String> = []
+    /// 从本预览拖出的条目（拖到镜像里指向真实文件夹的替身上时拷贝它们）；见 BrowserViewController+CopyToFolder.swift
+    var internalDragEntries: [Entry] = []
     var thumbnailRequests: [ObjectIdentifier: QLThumbnailGenerator.Request] = [:]
     /// 当前显示的图标大小。拖动滑块时只改它与布局，停下后才写入设置（见 iconSizeChanged）
     lazy var currentIconSize = CGFloat(PeekPreferences.iconSize)
@@ -306,9 +311,10 @@ public final class BrowserViewController: NSViewController {
         outlineView.target = self
         outlineView.doubleAction = #selector(doubleClicked(_:))
         // 拖入、拖出均为复制语义。
-        outlineView.registerForDraggedTypes([.fileURL])
+        outlineView.registerForDraggedTypes([.fileURL] + Self.internalDragTypes)
         outlineView.onDraggingBoundary = { [weak self] in self?.resetDropChecks() }
         outlineView.setDraggingSourceOperationMask(.copy, forLocal: false)
+        outlineView.setDraggingSourceOperationMask(.copy, forLocal: true)
         outlineView.contextMenuProvider = { [weak self] _ in self?.makeContextMenu() }
 
         // 表头右键：选择显示的列（单层菜单）
@@ -455,7 +461,7 @@ public final class BrowserViewController: NSViewController {
         for view in pathBarViews { view.isHidden = !PeekPreferences.showPathBar }
     }
 
-    private func refreshVisibleCells() {
+    func refreshVisibleCells() {
         let rows = outlineView.rows(in: outlineView.visibleRect)
         guard rows.length > 0 else { return }
         outlineView.reloadData(forRowIndexes: IndexSet(integersIn: rows.location..<NSMaxRange(rows)),
@@ -798,6 +804,10 @@ public final class BrowserViewController: NSViewController {
         var text = selected.isEmpty ? String(localized: "\(size)，\(roots.count) 个项目", bundle: .peekUI) : String(localized: "已选 \(selected.count) 项，\(size)", bundle: .peekUI)
         if let reader = archiveSource(forLevel: currentParent)?.loadedReader {
             if let xad = reader as? XADArchive { text += " · \(xad.formatName)" }
+            if let image = reader as? SevenZipArchive {
+                text += " · \(image.formatName)"
+                if let volume = image.volumeName { text += " · \(volume)" }
+            }
             if reader.tree.hasEncryptedEntries { text += String(localized: " · 含加密条目", bundle: .peekUI) }
         }
         subtitleLabel.stringValue = text
@@ -851,10 +861,9 @@ public final class BrowserViewController: NSViewController {
         if let url = entry.fileURL {
             return NSWorkspace.shared.icon(forFile: url.path)
         }
-        let type = entry.isDirectory
-            ? UTType.folder
-            : UTType(filenameExtension: (entry.name as NSString).pathExtension) ?? .data
-        return NSWorkspace.shared.icon(for: type)
+        if entry.isSymlink { return symlinkIcon(for: entry) }
+        if entry.isPackage, let icon = bundleIcon(for: entry) { return icon }
+        return typeIcon(name: entry.name, isDirectory: entry.isDirectory)
     }
 }
 
@@ -1003,6 +1012,9 @@ extension BrowserViewController: NSOutlineViewDelegate {
 
         if withIcon {
             let image = NSImageView()
+            // NSImageView 默认登记了文件与 File Promise 等拖放类型，且不可编辑时一律拒绝：
+            // 不取消登记，拖到行图标上时拖放交给它而到不了列表
+            image.unregisterDraggedTypes()
             image.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(image)
             cell.imageView = image

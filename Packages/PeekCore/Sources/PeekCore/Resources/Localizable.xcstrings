@@ -49,6 +49,22 @@
         }
       }
     },
+    "不支持的压缩方法": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unsupported compression method"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持的压缩方法"
+          }
+        }
+      }
+    },
     "不能删除压缩包中的全部内容": {
       "localizations": {
         "en": {
@@ -157,6 +173,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "写入设置失败"
+          }
+        }
+      }
+    },
+    "分区 %lld.img": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partition %lld.img"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分区 %lld.img"
+          }
+        }
+      }
+    },
+    "分区 %lld（%@）.img": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partition %1$lld (%2$@).img"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分区 %lld（%@）.img"
           }
         }
       }
@@ -497,6 +545,22 @@
         }
       }
     },
+    "无法写入：%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't write: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法写入：%@"
+          }
+        }
+      }
+    },
     "无法创建 %@": {
       "localizations": {
         "en": {
@@ -557,6 +621,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法识别的压缩包：%@"
+          }
+        }
+      }
+    },
+    "无法识别的磁盘镜像格式": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unrecognized disk image format"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法识别的磁盘镜像格式"
+          }
+        }
+      }
+    },
+    "无法读取磁盘镜像": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't read the disk image"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取磁盘镜像"
           }
         }
       }
@@ -705,6 +801,22 @@
         }
       }
     },
+    "目标文件夹不存在：%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The destination folder doesn't exist: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标文件夹不存在：%@"
+          }
+        }
+      }
+    },
     "磁盘可用空间不足，原压缩包未改动": {
       "localizations": {
         "en": {
@@ -717,6 +829,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "磁盘可用空间不足，原压缩包未改动"
+          }
+        }
+      }
+    },
+    "磁盘镜像数据损坏，无法提取": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The disk image data is damaged and can't be extracted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "磁盘镜像数据损坏，无法提取"
           }
         }
       }
@@ -813,6 +941,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "这是分卷的一部分，请预览第一卷 %@"
+          }
+        }
+      }
+    },
+    "这是加密的磁盘镜像，暂不支持预览": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This disk image is encrypted and can't be previewed yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是加密的磁盘镜像，暂不支持预览"
           }
         }
       }

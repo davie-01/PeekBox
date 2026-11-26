@@ -38,6 +38,9 @@ import Foundation
     /// 回复 (新增, 替换, 跳过, 是否取消, 错误信息)，数量按拖入的顶层项目计
     func addToArchive(archivePath: String, sourcePaths: [String], parent: String,
                       reply: @escaping @Sendable (Int, Int, Int, Bool, String?) -> Void)
+    /// 把归档条目拷到真实文件夹（见 ArchiveCopier）。回复同 addToArchive
+    func copyFromArchive(archivePath: String, entryPaths: [String], destination: String, password: String?,
+                         reply: @escaping @Sendable (Int, Int, Int, Bool, String?) -> Void)
 }
 
 public enum BrokerError: LocalizedError {
@@ -294,6 +297,27 @@ public final class BrokerClient: @unchecked Sendable {
     public func addToArchive(_ archive: URL, sources: [URL], parent: String) async throws -> ZipEditor.ImportSummary? {
         try await call { broker, done in
             broker.addToArchive(archivePath: archive.path, sourcePaths: sources.map(\.path), parent: parent) { added, replaced, skipped, cancelled, message in
+                if let message {
+                    done(.failure(BrokerError.failed(message)))
+                } else if cancelled {
+                    done(.success(nil))
+                } else {
+                    var summary = ZipEditor.ImportSummary()
+                    summary.added = added
+                    summary.replaced = replaced
+                    summary.skipped = skipped
+                    done(.success(summary))
+                }
+            }
+        }
+    }
+
+    /// 返回拷贝结果；nil 表示用户取消。进度与同名冲突在 Broker 的面板中处理
+    public func copyFromArchive(_ archive: URL, entryPaths: [String], to destination: URL,
+                                password: String?) async throws -> ZipEditor.ImportSummary? {
+        try await call { broker, done in
+            broker.copyFromArchive(archivePath: archive.path, entryPaths: entryPaths, destination: destination.path,
+                                   password: password) { added, replaced, skipped, cancelled, message in
                 if let message {
                     done(.failure(BrokerError.failed(message)))
                 } else if cancelled {

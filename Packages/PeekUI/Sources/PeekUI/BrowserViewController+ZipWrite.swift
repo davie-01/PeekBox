@@ -159,6 +159,11 @@ extension BrowserViewController {
     public func outlineView(_ outlineView: NSOutlineView, validateDrop info: any NSDraggingInfo,
                             proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
         let node = item as? BrowserNode
+        if isInternalDrag(info) {
+            let operation = validateCopyToFolder(onto: node?.entry)
+            if operation == .copy { outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex) }
+            return operation
+        }
         let target = zipDestination(for: node?.entry)
         let operation = validateImport(info, target: target)
         if operation == .copy { outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex) }
@@ -167,7 +172,8 @@ extension BrowserViewController {
 
     public func outlineView(_ outlineView: NSOutlineView, acceptDrop info: any NSDraggingInfo,
                             item: Any?, childIndex: Int) -> Bool {
-        acceptImport(info, target: zipDestination(for: (item as? BrowserNode)?.entry))
+        if isInternalDrag(info) { return acceptCopyToFolder(onto: (item as? BrowserNode)?.entry) }
+        return acceptImport(info, target: zipDestination(for: (item as? BrowserNode)?.entry))
     }
 
     public func collectionView(_ collectionView: NSCollectionView, validateDrop info: any NSDraggingInfo,
@@ -176,6 +182,11 @@ extension BrowserViewController {
         let point = collectionView.convert(info.draggingLocation, from: nil)
         let path = collectionView.indexPathForItem(at: point)
         let entry = path.flatMap { $0.item < roots.count ? roots[$0.item].entry : nil }
+        if isInternalDrag(info) {
+            let operation = validateCopyToFolder(onto: entry)
+            if operation == .copy, let path { proposedIndexPath.pointee = path as NSIndexPath; dropOperation.pointee = .on }
+            return operation
+        }
         let operation = validateImport(info, target: zipDestination(for: entry))
         if operation == .copy {
             if let path { proposedIndexPath.pointee = path as NSIndexPath; dropOperation.pointee = .on }
@@ -187,6 +198,7 @@ extension BrowserViewController {
     public func collectionView(_ collectionView: NSCollectionView, acceptDrop info: any NSDraggingInfo,
                                 indexPath: IndexPath, dropOperation: NSCollectionView.DropOperation) -> Bool {
         let entry = dropOperation == .on && indexPath.item < roots.count ? roots[indexPath.item].entry : nil
+        if isInternalDrag(info) { return acceptCopyToFolder(onto: entry) }
         return acceptImport(info, target: zipDestination(for: entry))
     }
 }

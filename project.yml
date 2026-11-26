@@ -49,7 +49,7 @@ targets:
             subpath: Contents/Library/LaunchAgents
       # GPL / LGPL 等许可要求随二进制附带许可原文与版权声明：拷入 Contents/Resources/Licenses（关于页可打开）。
       # 用复制文件阶段而不是脚本：作为构建输入被跟踪，内容变化时会重新签名。
-      # 只含随应用分发的组件；licenses/ 中 7-Zip、CMake、XcodeGen、libarchive 仅用于开发与测试
+      # 只含随应用分发的组件；licenses/ 中 CMake、XcodeGen、libarchive 仅用于开发与测试
       - path: LICENSE
         buildPhase:
           copyFiles:
@@ -81,6 +81,11 @@ targets:
             destination: resources
             subpath: Licenses
       - path: licenses/Sparkle.txt
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses
+      - path: licenses/7-Zip.txt
         buildPhase:
           copyFiles:
             destination: resources
@@ -129,7 +134,7 @@ targets:
           subpath: Contents/Helpers
       - package: PeekCore
       - package: Sparkle
-    # 后台服务包里自动嵌入了与主应用相同的 XADMaster / UniversalDetector（Mach-O UUID 相同），白占约 2 MB。
+    # 后台服务包里自动嵌入了与主应用相同的 XADMaster / UniversalDetector / CSevenZip（Mach-O UUID 相同），白占约 3 MB。
     # Swift 包的二进制框架在后台服务 target 的所有构建阶段之后才嵌入，只能在主应用拷入后台服务包后删除，
     # 再重新签名后台服务包；它运行时经 rpath 加载外层 Contents/Frameworks 中的同一份（主应用随后整体签名）
     postBuildScripts:
@@ -138,7 +143,7 @@ targets:
         script: |
           BROKER="$TARGET_BUILD_DIR/$WRAPPER_NAME/Contents/Helpers/PeekBoxBroker.app"
           [ -d "$BROKER" ] || exit 0
-          for framework in XADMaster UniversalDetector; do
+          for framework in XADMaster UniversalDetector CSevenZip; do
             rm -rf "$BROKER/Contents/Frameworks/$framework.framework"
           done
           rmdir "$BROKER/Contents/Frameworks" 2>/dev/null || true
@@ -227,6 +232,11 @@ targets:
               - org.tukaani.xz-archive
               - org.7-zip.7-zip-archive
               - com.rarlab.rar-archive
+              # 磁盘镜像（7-Zip 读取）：.dmg / .img、.cdr、.toast、.iso
+              - com.apple.disk-image-udif
+              - com.apple.disk-image-cdr
+              - com.roxio.disk-image-toast
+              - public.iso-image
     entitlements:
       path: Extensions/ArchivePreview/ArchivePreview.entitlements
       properties: *extensionEntitlements

@@ -36,9 +36,11 @@ final class ArchivePromiseDelegate: NSObject, NSFilePromiseProviderDelegate, Sen
 
     static func provider(for promise: ArchivePromise, isDirectory: Bool,
                          delegate: ArchivePromiseDelegate) -> NSFilePromiseProvider {
+        let ext = (promise.name as NSString).pathExtension
+        // 包（.app 等）按自身类型交付，接收方显示为应用而不是文件夹
         let type = isDirectory
-            ? UTType.folder
-            : UTType(filenameExtension: (promise.name as NSString).pathExtension) ?? .data
+            ? (ArchiveSource.isPackageName(promise.name) ? UTType(filenameExtension: ext, conformingTo: .directory) : nil) ?? .folder
+            : UTType(filenameExtension: ext) ?? .data
         let provider = NSFilePromiseProvider(fileType: type.identifier, delegate: delegate)
         provider.userInfo = promise
         return provider
@@ -71,6 +73,8 @@ final class ArchivePromiseDelegate: NSObject, NSFilePromiseProviderDelegate, Sen
         report(String(localized: "开始提取 \(promise.name)", bundle: .peekUI))
         do {
             try promise.reader.extract(path: promise.path, to: url, password: promise.source.password)
+            // 继承压缩包的隔离属性（下载来的 App 拖出后首次打开仍经过 Gatekeeper），见 Quarantine
+            Quarantine.inherit(from: promise.source.rootURL, to: [url])
             let elapsed = Int(Date().timeIntervalSince(started) * 1000)
             report(String(localized: "已提取 \(promise.name) → \(url.deletingLastPathComponent().lastPathComponent)（\(elapsed) ms）", bundle: .peekUI))
             completionHandler(nil)
