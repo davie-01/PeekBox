@@ -46,11 +46,12 @@ xcodebuild -project PeekBox.xcodeproj -scheme PeekBox -configuration Release \
   build -quiet
 
 APP="$DERIVED/Build/Products/Release/PeekBox.app"
-# 应用包目录的修改时间设为打包时刻（不影响代码签名），每个版本各不相同：
+# 应用包目录的修改时间设为打包时刻往前 10 分钟（不影响代码签名），每个版本各不相同：
 # - 增量构建不会更新包目录本身的时间，不设置则一直是首次构建时的旧时间，系统图标缓存据此认为应用没变；
-# - 解压、Finder 拷贝与打过补丁的 Sparkle 安装都原样保留它。用户安装时距打包已远超 5 分钟，
-#   LaunchServices 的首次登记即为稳定记录，之后启动主应用不会再重新登记、结束正在运行的预览扩展
-touch "$APP"
+# - 解压、Finder 拷贝与打过补丁的 Sparkle 安装都原样保留它。LaunchServices 认为在修改后约 5 分钟内做的登记
+#   可能不完整，之后每次启动主应用都会重新登记并结束正在运行的预览扩展。往前设 10 分钟，
+#   发布后马上安装或更新，首次登记也已是稳定记录（与 install.sh 相同）
+touch -t "$(date -v-10M +%Y%m%d%H%M.%S)" "$APP"
 if find "$APP" -name embedded.provisionprofile | grep -q .; then
   echo "错误：产物中包含 embedded.provisionprofile" >&2
   exit 1
