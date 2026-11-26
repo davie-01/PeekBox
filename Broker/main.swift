@@ -56,6 +56,41 @@ final class Broker: NSObject, NSXPCListenerDelegate, PeekBrokerProtocol, @unchec
         return FileIdentity(path: path) != executableIdentity
     }
 
+    /// 监视外层 PeekBox.app：被替换（Sparkle 原子交换）、移走（Finder 覆盖时移到废纸篓）或删除时由内核通知，
+    /// 不轮询。旧进程据此立即退出，而不是等到下一个连接进来才发现过期并拒绝它
+    /// （否则更新后预览里的第一次操作会丢失，再点一次才由 launchd 拉起新版本）
+    private var appBundleWatcher: DispatchSourceFileSystemObject?
+
+    func watchAppBundle() {
+        let url = Bundle.mainApp.bundleURL
+        guard url.pathExtension == "app" else { return }
+        // O_EVTONLY：只为接收事件打开，不妨碍目录被移走、删除或卷被推出
+        let fd = open(url.path, O_EVTONLY)
+        guard fd >= 0 else {
+            log.error("cannot watch app bundle: \(String(cString: strerror(errno)), privacy: .public)")
+            return
+        }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.rename, .delete, .revoke],
+                                                               queue: queue)
+        source.setEventHandler { [weak self] in self?.appBundleChanged() }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        appBundleWatcher = source
+    }
+
+    /// 在 queue 上执行。手头没有任务就立即退出；正在写入等则做完再退出（见 endWork）
+    private func appBundleChanged() {
+        guard isOutdated else { return }
+        appBundleWatcher?.cancel()
+        appBundleWatcher = nil
+        guard activeWork == 0 else {
+            log.notice("app updated, exiting after \(self.activeWork) task(s) finish")
+            return
+        }
+        log.notice("app updated, exiting outdated broker")
+        exit(0)
+    }
+
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         guard !isOutdated else {
             log.notice("app updated, rejecting connection from pid \(connection.processIdentifier)")
@@ -119,7 +154,8 @@ final class Broker: NSObject, NSXPCListenerDelegate, PeekBrokerProtocol, @unchec
     func endWork() {
         queue.async {
             self.activeWork -= 1
-            if self.activeWork == 0, self.activeConnections == 0 { self.scheduleIdleExit() }
+            // 已被新版本替换时，任务做完即退出，不等预览端断开连接（scheduleIdleExit 中退出）
+            if self.activeWork == 0, self.activeConnections == 0 || self.isOutdated { self.scheduleIdleExit() }
         }
     }
 
@@ -548,6 +584,7 @@ listener.delegate = broker
 // 串行清扫上次崩溃留下的未提交包后，再接收新写任务。
 ZipEditor.cleanupAbandonedTransactions()
 listener.resume()
+broker.watchAppBundle()
 // 被拉起后若始终没有连接，同样按空闲退出
 broker.scheduleIdleExitOnStart()
 // 回收超过保留时长的提取文件（后台服务按需启动，启动频率足够）
