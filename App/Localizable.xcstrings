@@ -798,6 +798,22 @@
         }
       }
     },
+    "在 GitHub 上查看": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View on GitHub"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 GitHub 上查看"
+          }
+        }
+      }
+    },
     "在压缩包内重命名、删除或替换后，修改前的压缩包会放进废纸篓，需要时可以找回。": {
       "extractionState": "manual",
       "localizations": {

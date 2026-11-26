@@ -326,8 +326,12 @@ private struct AboutPage: View {
         ("libzip", "BSD 3-Clause", "https://libzip.org"),
         ("XADMaster", "LGPL 2.1", "https://github.com/MacPaw/XADMaster"),
         ("UniversalDetector", "LGPL 2.1", "https://github.com/MacPaw/universal-detector"),
+        ("7-Zip", "LGPL 2.1", "https://www.7-zip.org"),
         ("Sparkle", "MIT", "https://sparkle-project.org"),
     ]
+
+    /// 项目主页（与 README、更新源同一个仓库）
+    private static let repository = URL(string: "https://github.com/davie-01/Peekbox")!
 
     /// 构建时拷入应用包的许可原文（见 project.yml 中拷到 Resources/Licenses 的文件）
     private static let licensesFolder: URL? = Bundle.main.resourceURL.map { $0.appendingPathComponent("Licenses") }
@@ -345,6 +349,7 @@ private struct AboutPage: View {
                         Text(String(localized: "版本 \(model.version)", bundle: .app)).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    Button(String(localized: "在 GitHub 上查看", bundle: .app)) { NSWorkspace.shared.open(Self.repository) }
                     Button(String(localized: "检查更新…", bundle: .app)) { model.checkForUpdates() }
                 }
                 .padding(.vertical, 4)

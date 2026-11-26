@@ -378,5 +378,6 @@
   "已取消拷贝": "Copy cancelled",
   "已跳过，未拷贝任何项目": "Skipped; nothing was copied",
   "已拷贝到“%@”": "Copied to “%@”",
-  "拷贝失败：%@": "Copy failed: %@"
+  "拷贝失败：%@": "Copy failed: %@",
+  "在 GitHub 上查看": "View on GitHub"
 }
